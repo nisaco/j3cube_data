@@ -21,6 +21,7 @@ const globalStyles = `
 // --- CONFIGURATION ---
 const API_BASE_URL = 'https://j3cube-data.onrender.com/api';
 const PAYSTACK_KEY = "pk_live_62dc43eeea153c81c216b75e3967f8a44ee94fc3"; 
+const FAVICON_URL = 'apple-touch-icon.png'; // J3Cube Logo
 
 const NETWORK_LOGOS = {
   'MTN': 'mtn_logo.png',
@@ -571,6 +572,18 @@ export default function App() {
 
   // Initial Data Fetch
   useEffect(() => { 
+    // Set Favicon dynamically
+    const link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      const newLink = document.createElement('link');
+      newLink.rel = 'icon';
+      newLink.href = FAVICON_URL;
+      document.head.appendChild(newLink);
+    } else {
+      link.href = FAVICON_URL;
+    }
+    document.title = 'J3Cube';
+
     const init = async () => {
       try {
         const uRes = await apiCall('/user-info');
@@ -647,7 +660,7 @@ export default function App() {
         
         <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r flex flex-col transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="p-6 border-b flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#009879] rounded-xl flex items-center justify-center text-white font-bold"><Box size={24} /></div>
+            <div className="w-10 h-10 bg-[#009879] rounded-xl flex items-center justify-center text-white font-bold"><img src={FAVICON_URL} alt="J3Cube" className="h-8 w-8 object-contain" /></div>
             <div><h2 className="font-bold text-lg">J3Cube</h2><p className="text-xs text-slate-400">v2.0 Premium</p></div>
           </div>
           <div className="flex-1 p-4 space-y-2">
