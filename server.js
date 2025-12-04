@@ -1,4 +1,9 @@
-require('dotenv').config();
+// --- 1. SETUP & IMPORTS ---
+// Fix: Only load .env file if we are NOT in production (Render provides env vars automatically)
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
+
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
@@ -80,71 +85,137 @@ app.use(express.static(path.join(__dirname, 'client/dist')));
 
 // --- ROUTES ---
 
+// 1. Get Plans (Dynamic based on Role)
 app.get('/api/data-plans', async (req, res) => {
     let role = 'Client';
     if (req.session.user) {
         try {
             const user = await User.findById(req.session.user.id);
             if (user) role = user.role;
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Role fetch error", e); }
     }
+    // Select price list based on role
     const prices = (role === 'Agent' || role === 'Admin') ? PRICING.WHOLESALE : PRICING.RETAIL;
     res.json({ plans: prices, role: role });
 });
 
+// 2. Signup (Default to Client)
 app.post('/api/signup', async (req, res) => {
     const { username, email, password } = req.body;
     if (!username || !email || !password) return res.status(400).json({ message: 'All fields required' });
+
     try {
         const exists = await User.findOne({ $or: [{ username }, { email }] });
         if (exists) return res.status(400).json({ message: 'User already exists.' });
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await User.create({ username, email, password: hashedPassword, walletBalance: 0, role: 'Client' });
+        // Everyone starts as Client.
+        const newUser = await User.create({
+            username, email, password: hashedPassword, walletBalance: 0, role: 'Client'
+        });
+
         req.session.user = { id: newUser._id, username, role: 'Client' };
         res.status(201).json({ message: 'Account created!', user: req.session.user });
     } catch (e) { res.status(500).json({ message: 'Server error' }); }
 });
 
+// 3. Upgrade to Agent (Verify 15 GHS Payment)
 app.post('/api/upgrade-agent', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     const { reference } = req.body;
+
     try {
         const paystackRes = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
             headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
         });
         const data = paystackRes.data.data;
+        
+        // 15 GHS = 1500 Pesewas
         if (data.status === 'success' && data.amount >= (AGENT_FEE_GHS * 100)) {
             await User.findByIdAndUpdate(req.session.user.id, { role: 'Agent' });
-            req.session.user.role = 'Agent';
+            req.session.user.role = 'Agent'; // Update session immediately
             res.json({ success: true, message: 'Upgraded to Agent successfully!' });
         } else {
             res.status(400).json({ message: 'Payment verification failed.' });
         }
-    } catch (e) { res.status(500).json({ message: 'Verification error' }); }
+    } catch (e) {
+        res.status(500).json({ message: 'Verification error' });
+    }
 });
 
+// 4. Verify Wallet Top-Up
+app.post('/api/verify-topup', async (req, res) => {
+    if (!req.session.user) return res.status(401).json({ message: 'Login required' });
+    const { reference, amount } = req.body; // 'amount' is what they want in wallet
+
+    try {
+        const paystackRes = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+            headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
+        });
+        const data = paystackRes.data.data;
+
+        // Verify if they paid Amount + 2%
+        const expectedTotal = amount * 1.02; 
+        const paidAmount = data.amount / 100;
+
+        // Allow 0.5 GHS variance for rounding
+        if (data.status === 'success' && Math.abs(paidAmount - expectedTotal) < 0.5) {
+            // Prevent double usage
+            const exists = await Order.findOne({ reference });
+            if (exists) return res.status(400).json({ message: 'Transaction already processed' });
+
+            // Credit Wallet (Only the requested amount, not the fee)
+            const user = await User.findById(req.session.user.id);
+            user.walletBalance += (amount * 100); 
+            await user.save();
+            req.session.user.walletBalance = user.walletBalance;
+
+            await Order.create({
+                userId: user._id, reference: reference, phoneNumber: 'Wallet', network: 'TopUp',
+                dataPlan: 'Wallet Funding', amount: amount, status: 'success', paymentMethod: 'paystack', role: user.role
+            });
+
+            res.json({ success: true, message: 'Wallet funded!', newBalance: user.walletBalance });
+        } else {
+            res.status(400).json({ message: 'Payment verification failed.' });
+        }
+    } catch (e) { res.status(500).json({ message: 'Server error' }); }
+});
+
+// 5. Data Purchase (CK-Godsway Integration)
 app.post('/api/purchase', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
+    
     const { network, planId, phone } = req.body;
     const userId = req.session.user.id;
+
     try {
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // Get Price based on Role
         const role = user.role;
         const priceList = (role === 'Agent' || role === 'Admin') ? PRICING.WHOLESALE : PRICING.RETAIL;
-        const plan = priceList[network]?.find(p => p.id === planId);
+        const networkPlans = priceList[network];
+        const plan = networkPlans.find(p => p.id === planId);
+
         if (!plan) return res.status(400).json({ message: 'Invalid plan selected' });
 
         const costPesewas = Math.round(plan.price * 100);
-        if (user.walletBalance < costPesewas) return res.status(400).json({ message: 'Insufficient wallet balance' });
+        
+        if (user.walletBalance < costPesewas) {
+            return res.status(400).json({ message: 'Insufficient wallet balance' });
+        }
 
+        // Deduct Money
         user.walletBalance -= costPesewas;
         await user.save();
         req.session.user.walletBalance = user.walletBalance;
 
-        // CK-Godsway Integration
+        // Call CK-Godsway
         const ckNetworkKey = NETWORK_MAP[network];
         const payload = { networkKey: ckNetworkKey, recipient: phone, capacity: planId };
+
         const apiResponse = await axios.post(`${CK_BASE_URL}/data-purchase`, payload, {
             headers: { 'Content-Type': 'application/json', 'X-API-Key': process.env.CK_API_KEY }
         });
@@ -156,58 +227,31 @@ app.post('/api/purchase', async (req, res) => {
                 network: network, dataPlan: plan.name, amount: plan.price, status: 'data_sent',
                 paymentMethod: 'wallet', role: role
             });
-            res.json({ status: 'success', message: 'Data sent successfully!', orderNumber: result.data.orderNumber });
+            res.json({ status: 'success', message: 'Data sent successfully!' });
         } else {
-            user.walletBalance += costPesewas; // Refund
+            // Refund on failure
+            user.walletBalance += costPesewas;
             await user.save();
-            res.status(500).json({ message: `Transaction failed: ${result.error || 'API Error'}. Wallet refunded.` });
+            res.status(500).json({ message: `Failed: ${result.error}. Wallet refunded.` });
         }
     } catch (error) {
         console.error("Purchase Error:", error.message);
         // Attempt Refund
         try {
              const userRefetch = await User.findById(userId);
-             // Verify not already refunded logic should be here in prod
-             // Re-adding balance blindly here is risky without transactions, 
-             // but acceptable for this scale.
-             userRefetch.walletBalance += (planId ? 0 : 0); // Placeholder, ideally specific amount
-             // For safety in this snippet we just log.
+             const priceList = (userRefetch.role === 'Agent' || userRefetch.role === 'Admin') ? PRICING.WHOLESALE : PRICING.RETAIL;
+             const plan = priceList[network]?.find(p => p.id === planId);
+             
+             if (plan) {
+                 userRefetch.walletBalance += Math.round(plan.price * 100); 
+                 await userRefetch.save();
+             }
         } catch (e) {}
         res.status(500).json({ message: 'System error. Contact support.' });
     }
 });
 
-app.post('/api/verify-topup', async (req, res) => {
-    if (!req.session.user) return res.status(401).json({ message: 'Login required' });
-    const { reference, amount } = req.body; 
-    try {
-        const paystackRes = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
-            headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
-        });
-        const data = paystackRes.data.data;
-        const expectedTotal = amount * 1.02; // Amount + 2% Fee
-        const paidAmount = data.amount / 100;
-
-        if (data.status === 'success' && Math.abs(paidAmount - expectedTotal) < 0.5) {
-            const exists = await Order.findOne({ reference });
-            if (exists) return res.status(400).json({ message: 'Transaction already processed' });
-
-            const user = await User.findById(req.session.user.id);
-            user.walletBalance += (amount * 100); 
-            await user.save();
-            req.session.user.walletBalance = user.walletBalance;
-
-            await Order.create({
-                userId: user._id, reference: reference, phoneNumber: 'Wallet', network: 'TopUp',
-                dataPlan: 'Wallet Funding', amount: amount, status: 'success', paymentMethod: 'paystack', role: user.role
-            });
-            res.json({ success: true, message: 'Wallet funded!', newBalance: user.walletBalance });
-        } else {
-            res.status(400).json({ message: 'Payment verification failed or mismatch.' });
-        }
-    } catch (e) { res.status(500).json({ message: 'Server error' }); }
-});
-
+// 6. Basic Auth Routes
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
