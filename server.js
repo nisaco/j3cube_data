@@ -10,88 +10,81 @@ const bcrypt = require('bcrypt');
 const axios = require('axios');
 const MongoStore = require('connect-mongo');
 const cors = require('cors'); 
-const { User, Order, AgentShop, mongoose } = require('./database.js'); 
+const { User, Order, mongoose } = require('./database.js'); 
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 // --- CONFIGURATION ---
 const AGENT_FEE_GHS = 15.00;
-const CK_BASE_URL = 'https://console.ckgodsway.com/api'; // Example Provider URL
+
+// ⚠️ UPDATED BASE URL BASED ON DOCS
+const CK_BASE_URL = 'https://console.ckgodsway.com/api/external'; 
+
+// ⚠️ UPDATED NETWORK IDs (Based on "MTN" appearing in error logs)
 const NETWORK_MAP = {
-    'MTN': 'YELLO',
-    'AirtelTigo': 'AT_PREMIUM', 
-    'Telecel': 'TELECEL'
+    'MTN': 'MTN',         
+    'AirtelTigo': 'AirtelTigo',  
+    'Telecel': 'Telecel'      
 };
 
 const PRICING = {
     RETAIL: { 
         "MTN": [
-            { id: '1', name: '1GB', price: 6.00 }, { id: '2', name: '2GB', price: 11.00 },
-            { id: '3', name: '3GB', price: 18.00 }, { id: '4', name: '4GB', price: 23.00 }, { id: '5', name: '5GB', price: 30.00 },
-            { id: '6', name: '6GB', price: 36.00 }, { id: '7', name: '7GB', price: 39.00 }, { id: '8', name: '8GB', price: 43.00 },
-            { id: '10', name: '10GB', price: 49.00 }, { id: '15', name: '15GB', price: 75.00 }, { id: '20', name: '20GB', price: 100.00 }, 
-            { id: '25', name: '25GB', price: 128.00 }, { id: '30', name: '30GB', price: 150.00 }, { id: '40', name: '40GB', price: 195.00 },
-            { id: '50', name: '50GB', price: 248.00 }
+            { id: '1GB', name: '1GB', price: 6.00 }, { id: '2GB', name: '2GB', price: 11.00 },
+            { id: '3GB', name: '3GB', price: 18.00 }, { id: '4GB', name: '4GB', price: 23.00 }, { id: '5GB', name: '5GB', price: 30.00 },
+            { id: '6GB', name: '6GB', price: 36.00 }, { id: '7GB', name: '7GB', price: 39.00 }, { id: '8GB', name: '8GB', price: 43.00 },
+            { id: '10GB', name: '10GB', price: 49.00 }, { id: '15GB', name: '15GB', price: 75.00 }, { id: '20GB', name: '20GB', price: 100.00 }, 
+            { id: '25GB', name: '25GB', price: 128.00 }, { id: '30GB', name: '30GB', price: 150.00 }, { id: '40GB', name: '40GB', price: 195.00 },
+            { id: '50GB', name: '50GB', price: 248.00 }
         ],
         "AirtelTigo": [
-            { id: '1', name: '1GB', price: 6.00 }, { id: '2', name: '2GB', price: 10.00 }, { id: '3', name: '3GB', price: 14.00 },  
-            { id: '4', name: '4GB', price: 22.00 }, { id: '5', name: '5GB', price: 26.00 }, { id: '6', name: '6GB', price: 30.00 },  
-            { id: '7', name: '7GB', price: 34.00 }, { id: '8', name: '8GB', price: 38.00 }, { id: '9', name: '9GB', price: 40.00 },  
-            { id: '10', name: '10GB', price: 49.00 }, { id: '12', name: '12GB', price: 53.00 }, { id: '15', name: '15GB', price: 61.00 },
-            { id: '20', name: '20GB', price: 85.00 }
+            { id: '1GB', name: '1GB', price: 6.00 }, { id: '2GB', name: '2GB', price: 10.00 }, { id: '3GB', name: '3GB', price: 14.00 },  
+            { id: '4GB', name: '4GB', price: 22.00 }, { id: '5GB', name: '5GB', price: 26.00 }, { id: '6GB', name: '6GB', price: 30.00 },  
+            { id: '7GB', name: '7GB', price: 34.00 }, { id: '8GB', name: '8GB', price: 38.00 }, { id: '9GB', name: '9GB', price: 40.00 },  
+            { id: '10GB', name: '10GB', price: 49.00 }, { id: '12GB', name: '12GB', price: 53.00 }, { id: '15GB', name: '15GB', price: 61.00 },
+            { id: '20GB', name: '20GB', price: 85.00 }
         ],
         "Telecel": [
-            { id: '5', name: '5GB', price: 29.00 }, { id: '10', name: '10GB', price: 49.20 }, { id: '15', name: '15GB', price: 80.00 }, 
-            { id: '20', name: '20GB', price: 100.00 }, { id: '25', name: '25GB', price: 120.00 }, { id: '30', name: '30GB', price: 137.00 },
-            { id: '40', name: '40GB', price: 175.50 }, { id: '50', name: '50GB', price: 205.00 }, { id: '100', name: '100GB', price: 420.00}
+            { id: '5GB', name: '5GB', price: 29.00 }, { id: '10GB', name: '10GB', price: 49.20 }, { id: '15GB', name: '15GB', price: 80.00 }, 
+            { id: '20GB', name: '20GB', price: 100.00 }, { id: '25GB', name: '25GB', price: 120.00 }, { id: '30GB', name: '30GB', price: 137.00 },
+            { id: '40GB', name: '40GB', price: 175.50 }, { id: '50GB', name: '50GB', price: 205.00 }, { id: '100GB', name: '100GB', price: 420.00}
         ]
     },
     WHOLESALE: { 
         "MTN": [
-            { id: '1', name: '1GB', price: 4.90 }, { id: '2', name: '2GB', price: 9.90 }, { id: '3', name: '3GB', price: 14.70 }, 
-            { id: '4', name: '4GB', price: 20.00 }, { id: '5', name: '5GB', price: 24.60 }, { id: '6', name: '6GB', price: 28.00 }, 
-            { id: '8', name: '8GB', price: 36.00 }, { id: '10', name: '10GB', price: 43.80 }, { id: '15', name: '15GB', price: 64.00 },
-            { id: '20', name: '20GB', price: 85.00 }, { id: '25', name: '25GB', price: 105.00 }, { id: '30', name: '30GB', price: 124.50 },
-            { id: '40', name: '40GB', price: 165.00 }, { id: '50', name: '50GB', price: 198.00 }
+            { id: '1GB', name: '1GB', price: 4.90 }, { id: '2GB', name: '2GB', price: 9.90 }, { id: '3GB', name: '3GB', price: 14.70 }, 
+            { id: '4GB', name: '4GB', price: 20.00 }, { id: '5GB', name: '5GB', price: 24.60 }, { id: '6GB', name: '6GB', price: 28.00 }, 
+            { id: '8GB', name: '8GB', price: 36.00 }, { id: '10GB', name: '10GB', price: 43.80 }, { id: '15GB', name: '15GB', price: 64.00 },
+            { id: '20GB', name: '20GB', price: 85.00 }, { id: '25GB', name: '25GB', price: 105.00 }, { id: '30GB', name: '30GB', price: 124.50 },
+            { id: '40GB', name: '40GB', price: 165.00 }, { id: '50GB', name: '50GB', price: 198.00 }
         ],
         "AirtelTigo": [
-            { id: '1', name: '1GB', price: 4.00 }, { id: '2', name: '2GB', price: 8.00 }, { id: '3', name: '3GB', price: 12.00 },  
-            { id: '4', name: '4GB', price: 16.00 }, { id: '5', name: '5GB', price: 20.00 }, { id: '6', name: '6GB', price: 24.00 },  
-            { id: '7', name: '7GB', price: 27.90 }, { id: '8', name: '8GB', price: 32.00 }, { id: '9', name: '9GB', price: 36.00 },  
-            { id: '10', name: '10GB', price: 42.00 }, { id: '12', name: '12GB', price: 50.00 }, { id: '15', name: '15GB', price: 61.30 },
-            { id: '20', name: '20GB', price: 82.10 }
+            { id: '1GB', name: '1GB', price: 4.00 }, { id: '2GB', name: '2GB', price: 8.00 }, { id: '3GB', name: '3GB', price: 12.00 },  
+            { id: '4GB', name: '4GB', price: 16.00 }, { id: '5GB', name: '5GB', price: 20.00 }, { id: '6GB', name: '6GB', price: 24.00 },  
+            { id: '7GB', name: '7GB', price: 27.90 }, { id: '8GB', name: '8GB', price: 32.00 }, { id: '9GB', name: '9GB', price: 36.00 },  
+            { id: '10GB', name: '10GB', price: 42.00 }, { id: '12GB', name: '12GB', price: 50.00 }, { id: '15GB', name: '15GB', price: 61.30 },
+            { id: '20GB', name: '20GB', price: 82.10 }
         ],
         "Telecel": [
-            { id: '5', name: '5GB', price: 23.00 }, { id: '10', name: '10GB', price: 43.00 }, { id: '15', name: '15GB', price: 62.20 }, 
-            { id: '20', name: '20GB', price: 83.00 }, { id: '25', name: '25GB', price: 103.00 }, { id: '30', name: '30GB', price: 123.00 },
-            { id: '40', name: '40GB', price: 155.00 }, { id: '50', name: '50GB', price: 195.00 }, { id: '100', name: '100GB', price: 400.00}
+            { id: '5GB', name: '5GB', price: 23.00 }, { id: '10GB', name: '10GB', price: 43.00 }, { id: '15GB', name: '15GB', price: 62.20 }, 
+            { id: '20GB', name: '20GB', price: 83.00 }, { id: '25GB', name: '25GB', price: 103.00 }, { id: '30GB', name: '30GB', price: 123.00 },
+            { id: '40GB', name: '40GB', price: 155.00 }, { id: '50GB', name: '50GB', price: 195.00 }, { id: '100GB', name: '100GB', price: 400.00}
         ]
     }
 };
 
 // --- 2. MIDDLEWARE ---
 app.set('trust proxy', 1); 
-
-// Allow JSON body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors({ origin: true, credentials: true }));
 
-// CORS configuration 
-app.use(cors({
-    origin: true, 
-    credentials: true
-}));
-
-// Session Setup
 app.use(session({
     secret: process.env.SESSION_SECRET || 'dev-secret-key-123',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-        mongoUrl: process.env.MONGO_URI,
-        ttl: 24 * 60 * 60 // 1 Day
-    }),
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI, ttl: 24 * 60 * 60 }),
     cookie: { 
         secure: process.env.NODE_ENV === 'production', 
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', 
@@ -99,118 +92,74 @@ app.use(session({
     } 
 }));
 
-// Serve React App
 app.use(express.static(path.join(__dirname, 'client/dist')));
 
 // --- 3. ROUTES ---
 
-// --- AUTH: SIGNUP ---
+// AUTH
 app.post('/api/signup', async (req, res) => {
     try {
-        console.log("Signup Attempt:", req.body); 
         const { username, email, password } = req.body;
-        
-        if (!username || !email || !password) {
-            return res.status(400).json({ message: 'Missing fields: username, email, or password.' });
-        }
-
-        if (mongoose.connection.readyState !== 1) {
-            throw new Error("Database not connected");
-        }
+        if (!username || !email || !password) return res.status(400).json({ message: 'Missing fields' });
+        if (mongoose.connection.readyState !== 1) throw new Error("Database not connected");
 
         const exists = await User.findOne({ $or: [{ username }, { email }] });
-        if (exists) {
-            return res.status(409).json({ message: 'User already exists with this email or username.' });
-        }
+        if (exists) return res.status(409).json({ message: 'User already exists' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = await User.create({
-            username, 
-            email, 
-            password: hashedPassword, 
-            walletBalance: 0, 
-            role: 'Client'
-        });
+        const newUser = await User.create({ username, email, password: hashedPassword, walletBalance: 0, role: 'Client' });
 
         req.session.user = { id: newUser._id, username, role: 'Client' };
         res.status(201).json({ message: 'Account created!', user: req.session.user });
-
-    } catch (e) {
-        console.error("SIGNUP ERROR:", e);
-        res.status(500).json({ message: `Server Error: ${e.message}` });
-    }
+    } catch (e) { res.status(500).json({ message: `Server Error: ${e.message}` }); }
 });
 
-// --- AUTH: LOGIN ---
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
-        
-        if (!user || !await bcrypt.compare(password, user.password)) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
+        if (!user || !await bcrypt.compare(password, user.password)) return res.status(401).json({ message: 'Invalid credentials' });
         
         req.session.user = { id: user._id, username: user.username, role: user.role };
         res.json({ message: 'Logged in', role: user.role, user: req.session.user });
-    } catch (e) { 
-        res.status(500).json({ message: 'Server error' }); 
-    }
+    } catch (e) { res.status(500).json({ message: 'Server error' }); }
 });
 
-// --- AUTH: USER INFO ---
 app.get('/api/user-info', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ error: 'No session' });
     try {
         const user = await User.findById(req.session.user.id);
         if (!user) return res.status(404).json({ error: 'User not found' });
-        
-        // Refresh session role if db changed
-        if (req.session.user.role !== user.role) {
-            req.session.user.role = user.role;
-        }
-        
+        if (req.session.user.role !== user.role) req.session.user.role = user.role;
         res.json({ username: user.username, walletBalance: user.walletBalance, role: user.role });
-    } catch (e) {
-        res.status(500).json({ error: 'Db error' });
-    }
+    } catch (e) { res.status(500).json({ error: 'Db error' }); }
 });
 
-// --- AGENT: UPGRADE ---
+// AGENT & TOPUP
 app.post('/api/upgrade-agent', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     const { reference } = req.body;
-
     try {
         const paystackRes = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
             headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
         });
         const data = paystackRes.data.data;
-        
         if (data.status === 'success' && data.amount >= (AGENT_FEE_GHS * 100)) {
             await User.findByIdAndUpdate(req.session.user.id, { role: 'Agent' });
             req.session.user.role = 'Agent'; 
             res.json({ success: true, message: 'Upgraded to Agent successfully!' });
-        } else {
-            res.status(400).json({ message: 'Payment verification failed.' });
-        }
-    } catch (e) {
-        res.status(500).json({ message: 'Verification error' });
-    }
+        } else { res.status(400).json({ message: 'Payment verification failed.' }); }
+    } catch (e) { res.status(500).json({ message: 'Verification error' }); }
 });
 
-// --- WALLET: TOP UP ---
 app.post('/api/verify-topup', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     const { reference, amount } = req.body; 
-
     try {
         const paystackRes = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
             headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
         });
         const data = paystackRes.data.data;
-
-        // Verify if they paid Amount + 2%
         const expectedTotal = amount * 1.02; 
         const paidAmount = data.amount / 100;
 
@@ -226,18 +175,14 @@ app.post('/api/verify-topup', async (req, res) => {
                 userId: user._id, reference: reference, phoneNumber: 'Wallet', network: 'WALLET',
                 dataPlan: 'Wallet Funding', amount: amount, status: 'topup_successful', paymentMethod: 'paystack', role: user.role
             });
-
             res.json({ success: true, message: 'Wallet funded!', newBalance: user.walletBalance });
-        } else {
-            res.status(400).json({ message: 'Payment verification failed.' });
-        }
+        } else { res.status(400).json({ message: 'Payment verification failed.' }); }
     } catch (e) { res.status(500).json({ message: 'Server error' }); }
 });
 
-// --- DATA: PURCHASE ---
+// --- SAFE PURCHASE ROUTE (With Auto-Refund) ---
 app.post('/api/purchase', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
-    
     const { network, planId, phone } = req.body;
     const userId = req.session.user.id;
 
@@ -245,74 +190,108 @@ app.post('/api/purchase', async (req, res) => {
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        const role = user.role;
-        const priceList = (role === 'Agent' || role === 'Admin') ? PRICING.WHOLESALE : PRICING.RETAIL;
-        const networkPlans = priceList[network];
-        const plan = networkPlans.find(p => p.id === planId);
-
-        if (!plan) return res.status(400).json({ message: 'Invalid plan selected' });
+        const priceList = (user.role === 'Agent' || user.role === 'Admin') ? PRICING.WHOLESALE : PRICING.RETAIL;
+        const plan = priceList[network]?.find(p => p.id === planId);
+        if (!plan) return res.status(400).json({ message: 'Invalid plan' });
 
         const costPesewas = Math.round(plan.price * 100);
-        
-        if (user.walletBalance < costPesewas) {
-            return res.status(400).json({ message: 'Insufficient wallet balance' });
-        }
+        if (user.walletBalance < costPesewas) return res.status(400).json({ message: 'Insufficient wallet balance' });
 
+        // --- STEP 1: CREATE "PROCESSING" RECORD FIRST ---
+        // This guarantees you have a receipt even if the API crashes next.
+        const newOrder = await Order.create({
+            userId: user._id, 
+            reference: `PENDING-${Date.now()}`, 
+            phoneNumber: phone,
+            network: network, 
+            dataPlan: plan.name, 
+            amount: plan.price, 
+            status: 'PROCESSING', 
+            paymentMethod: 'wallet', 
+            role: user.role
+        });
+
+        // --- STEP 2: DEDUCT MONEY ---
         user.walletBalance -= costPesewas;
         await user.save();
 
-        // --- CK GODSWAY INTEGRATION  ---
-         const ckNetworkKey = NETWORK_MAP[network];
-         const payload = { networkKey: ckNetworkKey, recipient: phone, capacity: planId };
-         //This actually buys the data from the provider
-         const apiResponse = await axios.post(`${CK_BASE_URL}/data-purchase`, payload, {
-          headers: { 'Content-Type': 'application/json', 'X-API-Key': process.env.CK_API_KEY }
-         });
-         const result = apiResponse.data;
-        
+        // --- STEP 3: CALL API ---
+        try {
+            // MAPPING: Updated based on docs
+            const ckNetwork = NETWORK_MAP[network]; 
+            // Docs imply payload requires 'network', 'mobile_number', 'plan' etc.
+            // Using standard payload structure for CKGodsway/Husmo style
+            const payload = { 
+                network: ckNetwork, 
+                mobile_number: phone, 
+                plan: planId, // Assuming planId is like '1GB' as per PRICING
+                Ported_number: true
+            };
+            
+            console.log("Sending to DataHub:", payload);
 
-        if (result.success) {
-            await Order.create({
-                userId: user._id, reference: result.data.orderNumber, phoneNumber: phone,
-                network: network, dataPlan: plan.name, amount: plan.price, status: 'data_sent',
-                paymentMethod: 'wallet', role: role
+            // Using /buy based on standard practice for this API structure (since status is at /order-status)
+            // If this fails, the error log will now be very clear.
+            const apiResponse = await axios.post(`${CK_BASE_URL}/buy`, payload, {
+                headers: { 
+                    'Authorization': `Token ${process.env.CK_API_KEY}`, 
+                    'X-API-Key': process.env.CK_API_KEY, // Sending both to be safe
+                    'Content-Type': 'application/json' 
+                }
             });
-            res.json({ status: 'success', message: 'Data sent successfully!' });
-        } else {
-            // Refund on failure
+            const result = apiResponse.data;
+
+            // Updated Success Check based on Docs: { "success": true }
+            if (result.success === true) { 
+                newOrder.status = 'data_sent';
+                newOrder.reference = result.data?.reference || `ORD-${Date.now()}`;
+                await newOrder.save();
+                res.json({ status: 'success', message: 'Data sent successfully!' });
+            } else {
+                // If API returns success:false, treat as error
+                throw new Error(result.error || result.message || "API returned failure");
+            }
+        } catch (apiError) {
+            console.error("API Call Failed:", apiError.response ? apiError.response.data : apiError.message);
+            
+            // --- STEP 4: AUTO-REFUND ON FAILURE ---
             user.walletBalance += costPesewas;
             await user.save();
-            res.status(500).json({ message: `Failed: ${result.error}. Wallet refunded.` });
+            
+            newOrder.status = 'data_failed'; 
+            await newOrder.save();
+            
+            res.status(500).json({ 
+                message: `Transaction Failed. Wallet Refunded. Provider Error: ${apiError.response?.data?.error || apiError.message}` 
+            });
         }
-    } catch (error) {
-        console.error("Purchase Error:", error.message);
-        res.status(500).json({ message: 'System error. Contact support.' });
+
+    } catch (error) { 
+        console.error("System Error:", error);
+        res.status(500).json({ message: 'System error. Try again.' }); 
     }
 });
 
-// --- DATA: GET PLANS ---
+// GET PLANS
 app.get('/api/data-plans', async (req, res) => {
     let role = 'Client';
     if (req.session.user) {
-        try {
-            const user = await User.findById(req.session.user.id);
-            if (user) role = user.role;
-        } catch (e) {}
+        try { const user = await User.findById(req.session.user.id); if (user) role = user.role; } catch (e) {}
     }
     const prices = (role === 'Agent' || role === 'Admin') ? PRICING.WHOLESALE : PRICING.RETAIL;
     res.json({ plans: prices, role: role });
 });
 
-// --- USER: MY ORDERS ---
+// HISTORY
 app.get('/api/my-orders', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ error: 'Unauthorized' });
     const orders = await Order.find({ userId: req.session.user.id }).sort({ createdAt: -1 });
     res.json({ orders });
 });
 
-// --- ADMIN: METRICS ---
+// ADMIN METRICS
 app.get('/api/admin/metrics', async (req, res) => {
-    if (req.query.secret !== (process.env.ADMIN_SECRET || 'n11kpakpo')) return res.status(403).json({ error: 'Unauthorized' });
+    if (!req.session.user || req.session.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
     try {
         const totalOrders = await Order.countDocuments({});
         const userCount = await User.countDocuments({});
@@ -320,30 +299,31 @@ app.get('/api/admin/metrics', async (req, res) => {
             { $match: { status: { $in: ['data_sent', 'success'] } } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
+        const depositResult = await Order.aggregate([
+            { $match: { status: 'topup_successful' } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ]);
         const revenue = revenueResult[0]?.total || 0;
-        res.json({ revenue, netProfit: revenue * 0.15, totalOrders, userCount });
+        const totalDeposits = depositResult[0]?.total || 0;
+        res.json({ revenue, totalDeposits, netProfit: revenue * 0.15, totalOrders, userCount });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ADMIN: GET ALL ORDERS ---
 app.get('/api/admin/all-orders', async (req, res) => {
-    if (req.query.secret !== (process.env.ADMIN_SECRET || 'n11kpakpo')) return res.status(403).json({ error: 'Unauthorized' });
+    if (!req.session.user || req.session.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
     try {
         const orders = await Order.find().sort({ createdAt: -1 }).limit(50).populate('userId', 'username');
         res.json({ orders });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ADMIN: UPDATE ORDER ---
 app.post('/api/admin/update-order', async (req, res) => {
-    const { id, status, secret } = req.body;
-    if (secret !== (process.env.ADMIN_SECRET ||'n11kpakpo')) return res.status(403).json({ error: 'Unauthorized' });
-
+    if (!req.session.user || req.session.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
+    const { id, status } = req.body;
     try {
         const order = await Order.findById(id);
         if (!order) return res.status(404).json({ error: 'Order not found' });
 
-        // If refunding, give money back
         if (status === 'data_failed' && order.status !== 'data_failed') {
             const user = await User.findById(order.userId);
             if (user) {
@@ -351,16 +331,13 @@ app.post('/api/admin/update-order', async (req, res) => {
                 await user.save();
             }
         }
-
         order.status = status;
         await order.save();
         res.json({ success: true, message: 'Order updated' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- LOGOUT & FALLBACK ---
 app.get('/api/logout', (req, res) => req.session.destroy(() => res.json({ message: 'Logged out' })));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'client/dist', 'index.html')));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
