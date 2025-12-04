@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Wifi, History, LogOut, Menu, X, Wallet, 
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
-  Loader2, User, Eye, EyeOff, ShieldCheck, Box
+  Loader2, User, Eye, EyeOff, ShieldCheck, Box,
+  TrendingUp, Users, CreditCard, Activity, Lock
 } from 'lucide-react';
 
-// --- Global Styles for 100% Full Screen ---
+// --- Global Styles ---
 const globalStyles = `
   html, body, #root {
     height: 100%;
@@ -25,10 +26,8 @@ const PAYSTACK_KEY = "pk_live_62dc43eeea153c81c216b75e3967f8a44ee94fc3";
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  // MERGE options with defaults
   const fetchOptions = {
     ...options,
-    // CRITICAL: This allows cookies (sessions) to be sent/received
     credentials: 'include', 
     headers: {
       'Content-Type': 'application/json',
@@ -39,20 +38,29 @@ const apiCall = async (endpoint, options = {}) => {
   try {
     const response = await fetch(url, fetchOptions);
 
-    // Handle 401 silently (User just needs to log in)
     if (response.status === 401) {
       return null;
     }
 
+    const contentType = response.headers.get("content-type");
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Server Error (${response.status})`);
+      if (contentType && contentType.includes("application/json")) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Server Error (${response.status})`);
+      } else {
+        const text = await response.text();
+        console.error("Raw Server Error:", text);
+        throw new Error(`Critical Server Error (${response.status}). Check backend logs.`);
+      }
     }
 
-    return await response.json();
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
+    }
+    return { success: true }; 
   } catch (error) {
     console.error(`API Error (${endpoint}):`, error.message);
-    throw error; // Re-throw so components can handle specific errors
+    throw error;
   }
 };
 
@@ -63,7 +71,8 @@ const Button = ({ children, onClick, disabled = false, fullWidth = false, varian
   const variants = {
     primary: "bg-[#009879] text-white hover:bg-[#007a63] shadow-lg shadow-emerald-100",
     outline: "border-2 border-slate-200 text-slate-600 hover:border-[#009879] hover:text-[#009879]",
-    dark: "bg-slate-800 text-white hover:bg-slate-900"
+    dark: "bg-slate-800 text-white hover:bg-slate-900",
+    danger: "bg-red-50 text-red-600 hover:bg-red-100"
   };
   return <button onClick={onClick} disabled={disabled} className={`${base} ${variants[variant]} ${fullWidth ? 'w-full' : ''}`}>{children}</button>;
 };
@@ -122,7 +131,7 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
             <h1 className="text-3xl md:text-5xl font-bold tracking-tight">GHS {(user.walletBalance / 100).toFixed(2)}</h1>
           </div>
           <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold border border-white/30">
-            {user.role === 'Agent' ? '⚡ AGENT' : '👤 CLIENT'}
+            {user.role === 'Agent' ? '⚡ AGENT' : (user.role === 'Admin' ? '🛡️ ADMIN' : '👤 CLIENT')}
           </div>
         </div>
         <div className="flex flex-col md:flex-row gap-3 mt-8">
@@ -169,6 +178,56 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
   </div>
 );
 
+const AdminDashboard = () => {
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Uses the secret query param you set in the backend code
+    apiCall('/admin/metrics?secret=admin123')
+      .then(data => setMetrics(data))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-[#009879]"><Loader2 className="animate-spin" size={40} /></div>;
+
+  return (
+    <div className="space-y-6 animate-in fade-in pb-20">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-3 bg-red-100 text-red-600 rounded-xl"><Lock size={24} /></div>
+        <h2 className="text-2xl font-bold text-slate-800">Admin Dashboard</h2>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><TrendingUp size={16} /> Revenue</div>
+          <div className="text-3xl font-bold text-[#009879]">GHS {(metrics?.revenue || 0).toFixed(2)}</div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><CreditCard size={16} /> Net Profit</div>
+          <div className="text-3xl font-bold text-blue-600">GHS {(metrics?.netProfit || 0).toFixed(2)}</div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Users size={16} /> Total Users</div>
+          <div className="text-3xl font-bold text-slate-800">{metrics?.userCount || 0}</div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Activity size={16} /> Orders</div>
+          <div className="text-3xl font-bold text-slate-800">{metrics?.totalOrders || 0}</div>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl">
+        <h3 className="font-bold text-blue-800 mb-2">System Status</h3>
+        <p className="text-sm text-blue-600">
+          The system is currently online. To manage users or verify payments manually, please use your MongoDB Atlas dashboard or the Paystack dashboard.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const Purchase = ({ refreshUser }) => {
   const [plans, setPlans] = useState({ MTN: [], AirtelTigo: [], Telecel: [] });
   const [network, setNetwork] = useState('MTN');
@@ -178,7 +237,6 @@ const Purchase = ({ refreshUser }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Fetch plans - Use .catch to prevent unhandled promise rejections
     apiCall('/data-plans')
       .then(data => { if(data && data.plans) setPlans(data.plans); })
       .catch(err => console.log("Plan fetch error:", err));
@@ -247,20 +305,41 @@ const Purchase = ({ refreshUser }) => {
   );
 };
 
+// --- AUTH COMPONENT WITH STEALTH ADMIN ---
 const Auth = ({ onLogin, mode, setMode }) => {
-  // Use 'username' NOT 'name' to match backend schema
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
   const [roleSelection, setRoleSelection] = useState('Client'); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Stealth Admin Mode
+  const [stealthClicks, setStealthClicks] = useState(0);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+
+  const handleStealthClick = () => {
+    if (stealthClicks + 1 >= 5) {
+      setIsAdminMode(true);
+      setStealthClicks(0);
+      alert("Admin Portal Accessed");
+    } else {
+      setStealthClicks(prev => prev + 1);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // CLEAN DATA
+    const cleanData = {
+      username: formData.username.trim(),
+      email: formData.email.trim(),
+      password: formData.password
+    };
     
     if (mode === 'signup' && roleSelection === 'Agent') {
-      handleAgentUpgrade();
+      handleAgentUpgrade(cleanData);
       return;
     }
 
@@ -268,36 +347,45 @@ const Auth = ({ onLogin, mode, setMode }) => {
       const endpoint = mode === 'login' ? '/login' : '/signup';
       const res = await apiCall(endpoint, {
         method: 'POST',
-        body: JSON.stringify(formData)
+        body: JSON.stringify(cleanData)
       });
       
       if (res) {
-        onLogin();
+        // SECURITY CHECK FOR ADMIN LOGIN
+        if (isAdminMode && res.role !== 'Admin') {
+            await apiCall('/logout'); // Kick them out
+            setError("Access Denied: You are not an Admin.");
+        } else {
+            onLogin();
+        }
       }
     } catch (err) {
-      setError(err.message || "Authentication failed");
+      if (err.message.includes('Critical Server Error')) {
+        setError("Backend Crash: Please check your Render Logs. The server is not responding correctly.");
+      } else if (err.message.includes('500') && mode === 'signup') {
+        setError("Error: This Username or Email might already be taken.");
+      } else {
+        setError(err.message || "Authentication failed");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAgentUpgrade = async () => {
+  const handleAgentUpgrade = async (cleanData) => {
     try {
-      // 1. Signup
       const signupRes = await apiCall('/signup', {
-        method: 'POST', body: JSON.stringify(formData)
+        method: 'POST', body: JSON.stringify(cleanData)
       });
       if (!signupRes) throw new Error("Signup failed");
       
-      // 2. Login to get session
       await apiCall('/login', { 
-        method: 'POST', body: JSON.stringify({ username: formData.username, password: formData.password }) 
+        method: 'POST', body: JSON.stringify({ username: cleanData.username, password: cleanData.password }) 
       });
 
-      // 3. Paystack
       const handler = window.PaystackPop && window.PaystackPop.setup({
         key: PAYSTACK_KEY,
-        email: formData.email,
+        email: cleanData.email,
         amount: 1500, // 15 GHS
         currency: 'GHS',
         callback: async (response) => {
@@ -309,7 +397,7 @@ const Auth = ({ onLogin, mode, setMode }) => {
             onLogin();
           } else { 
             alert("Verification Failed."); 
-            onLogin(); // Log in as client anyway
+            onLogin(); 
           }
         },
         onClose: () => {
@@ -331,16 +419,23 @@ const Auth = ({ onLogin, mode, setMode }) => {
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
       <div className="bg-white w-full max-w-md p-8 md:p-10 rounded-3xl shadow-xl">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#009879] rounded-2xl flex items-center justify-center mx-auto mb-4 text-white shadow-lg shadow-emerald-200">
-            {mode === 'login' ? <User size={32} /> : <ShieldCheck size={32} />}
+          <div 
+             onClick={handleStealthClick}
+             className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white shadow-lg shadow-emerald-200 cursor-default select-none ${isAdminMode ? 'bg-red-600' : 'bg-[#009879]'}`}
+          >
+            {isAdminMode ? <Lock size={32} /> : (mode === 'login' ? <User size={32} /> : <ShieldCheck size={32} />)}
           </div>
-          <h1 className="text-3xl font-bold text-slate-800">{mode === 'login' ? 'Welcome Back' : 'Join AJEnterprise'}</h1>
-          <p className="text-slate-500 mt-2">Premium Data Vending Platform</p>
+          <h1 className="text-3xl font-bold text-slate-800">
+            {isAdminMode ? 'Admin Portal' : (mode === 'login' ? 'Welcome Back' : 'Join AJEnterprise')}
+          </h1>
+          <p className="text-slate-500 mt-2">
+            {isAdminMode ? 'Restricted Access' : 'Premium Data Vending Platform'}
+          </p>
         </div>
 
         {error && <div className="p-3 mb-6 bg-red-50 text-red-600 rounded-lg text-sm text-center font-bold">{error}</div>}
 
-        {mode === 'signup' && (
+        {!isAdminMode && mode === 'signup' && (
           <div className="flex bg-slate-50 p-1 rounded-xl mb-6 border border-slate-200">
             <button type="button" onClick={() => setRoleSelection('Client')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${roleSelection === 'Client' ? 'bg-white shadow text-[#009879]' : 'text-slate-500'}`}>
               Client (Free)
@@ -353,20 +448,33 @@ const Auth = ({ onLogin, mode, setMode }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Username" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} placeholder="Username" />
-          {mode === 'signup' && <Input label="Email Address" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="name@example.com" />}
+          
+          {/* Only show Email for signup OR Admin mode (Admin usually just needs username, but keeping consistency) */}
+          {(mode === 'signup' && !isAdminMode) && <Input label="Email Address" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="name@example.com" />}
+          
           <Input label="Password" isPassword value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder="••••••••" />
           
-          <Button fullWidth disabled={loading}>
-            {loading ? <Loader2 className="animate-spin" /> : (mode === 'login' ? 'Log In' : (roleSelection === 'Agent' ? 'Pay 15 GHS & Register' : 'Register Free'))}
+          <Button fullWidth disabled={loading} variant={isAdminMode ? 'danger' : 'primary'}>
+            {loading ? <Loader2 className="animate-spin" /> : (isAdminMode ? 'Authenticate Admin' : (mode === 'login' ? 'Log In' : (roleSelection === 'Agent' ? 'Pay 15 GHS & Register' : 'Register Free')))}
           </Button>
         </form>
 
-        <p className="text-center mt-6 text-sm text-slate-500">
-          {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
-          <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); }} className="text-[#009879] font-bold hover:underline">
-            {mode === 'login' ? 'Register' : 'Log In'}
-          </button>
-        </p>
+        {!isAdminMode && (
+          <p className="text-center mt-6 text-sm text-slate-500">
+            {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
+            <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); }} className="text-[#009879] font-bold hover:underline">
+              {mode === 'login' ? 'Register' : 'Log In'}
+            </button>
+          </p>
+        )}
+        
+        {isAdminMode && (
+            <p className="text-center mt-6 text-sm text-slate-400">
+                <button onClick={() => { setIsAdminMode(false); setError(''); }} className="text-slate-500 hover:text-slate-700">
+                    Return to User Login
+                </button>
+            </p>
+        )}
       </div>
     </div>
   );
@@ -459,13 +567,14 @@ export default function App() {
   useEffect(() => { 
     const init = async () => {
       try {
-        // Try fetching user info. If 401, it returns null.
         const uRes = await apiCall('/user-info');
         if (uRes) {
           setUser(uRes);
-          // Only fetch orders if we have a user
           const oRes = await apiCall('/my-orders');
           if (oRes) setTransactions(oRes.orders || []);
+          // If admin, default to admin view on load
+          if (uRes.role === 'Admin') setView('admin');
+          else setView('dashboard');
         }
       } catch (e) {
         console.log("Initialization error (likely network or CORS):", e);
@@ -482,6 +591,7 @@ export default function App() {
       if (uRes) setUser(uRes);
       const oRes = await apiCall('/my-orders');
       if (oRes) setTransactions(oRes.orders || []);
+      // Stay on current view if refreshing
     } catch (e) { console.error(e); }
   };
 
@@ -535,7 +645,17 @@ export default function App() {
             <div><h2 className="font-bold text-lg">AJEnterprise</h2><p className="text-xs text-slate-400">v2.0 Premium</p></div>
           </div>
           <div className="flex-1 p-4 space-y-2">
+            
+            {/* --- MENU ITEMS --- */}
             <button onClick={() => {setView('dashboard'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'dashboard' ? 'bg-[#009879] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><LayoutDashboard size={20}/> Dashboard</button>
+            
+            {/* --- ADMIN BUTTON (Only shows if role is Admin) --- */}
+            {user.role === 'Admin' && (
+              <button onClick={() => {setView('admin'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'admin' ? 'bg-red-600 text-white shadow-md' : 'text-red-600 hover:bg-red-50'}`}>
+                <Lock size={20}/> Admin Panel
+              </button>
+            )}
+
             <button onClick={() => {setView('purchase'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'purchase' ? 'bg-[#009879] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><Wifi size={20}/> Buy Data</button>
             <button onClick={() => {setView('history'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'history' ? 'bg-[#009879] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><History size={20}/> History</button>
           </div>
@@ -556,7 +676,9 @@ export default function App() {
           
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50">
             <div className="max-w-7xl mx-auto w-full">
+              {/* --- VIEW ROUTER --- */}
               {view === 'dashboard' && <Dashboard user={user} transactions={transactions} setView={setView} onTopUp={() => setShowTopUp(true)} />}
+              {view === 'admin' && user.role === 'Admin' && <AdminDashboard />}
               {view === 'purchase' && <Purchase refreshUser={fetchData} />}
               {view === 'history' && <div className="bg-white rounded-2xl p-6 shadow-sm"><h2 className="font-bold mb-4">History</h2>{transactions.map(t => <div key={t._id} className="p-3 border-b flex justify-between last:border-0"><span>{t.dataPlan}</span><b>GHS {t.amount}</b></div>)}</div>}
             </div>
