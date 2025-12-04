@@ -190,16 +190,14 @@ const AdminDashboard = () => {
   const [metrics, setMetrics] = useState(null);
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'orders'
+  const [activeTab, setActiveTab] = useState('overview'); 
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Metrics
       const mRes = await apiCall('/admin/metrics?secret=admin123');
       if (mRes) setMetrics(mRes);
 
-      // 2. Fetch All Orders (Requires new backend route)
       const oRes = await apiCall('/admin/all-orders?secret=admin123');
       if (oRes && oRes.orders) setAllOrders(oRes.orders);
     } catch (err) {
@@ -220,7 +218,7 @@ const AdminDashboard = () => {
       });
       if (res && res.success) {
         alert("Status Updated");
-        fetchData(); // Refresh list
+        fetchData(); 
       } else {
         alert("Update Failed: " + (res?.error || "Unknown"));
       }
@@ -580,7 +578,15 @@ const TopUpModal = ({ isOpen, onClose, onConfirm }) => {
     if (!amount || isNaN(amount) || amount < 1) return;
     setProcessing(true);
     
-    const handler = window.PaystackPop && window.PaystackPop.setup({
+    // Safety check: Ensure script loaded
+    if (!window.PaystackPop) {
+        alert("Payment System loading... Please wait 3 seconds and try again.");
+        return;
+    }
+    
+    setProcessing(true);
+    
+    const handler = window.PaystackPop.setup({
       key: PAYSTACK_KEY,
       email: "user@example.com", 
       amount: Math.ceil(totalCharge * 100),
@@ -597,10 +603,6 @@ const TopUpModal = ({ isOpen, onClose, onConfirm }) => {
     });
     
     if (handler) handler.openIframe();
-    else {
-      alert("Paystack SDK not loaded.");
-      setProcessing(false);
-    }
   };
 
   return (
@@ -652,9 +654,15 @@ export default function App() {
   const [showTopUp, setShowTopUp] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
 
-  // Initial Data Fetch
+  // Initial Data Fetch & Scripts
   useEffect(() => { 
-    // Set Favicon dynamically
+    // 1. Force Load Paystack Script
+    const script = document.createElement('script');
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    // 2. Set Favicon dynamically
     const link = document.querySelector("link[rel~='icon']");
     if (!link) {
       const newLink = document.createElement('link');
@@ -666,6 +674,7 @@ export default function App() {
     }
     document.title = 'J3Cube';
 
+    // 3. Check Session
     const init = async () => {
       try {
         const uRes = await apiCall('/user-info');
@@ -673,17 +682,20 @@ export default function App() {
           setUser(uRes);
           const oRes = await apiCall('/my-orders');
           if (oRes) setTransactions(oRes.orders || []);
-          // If admin, default to admin view on load
           if (uRes.role === 'Admin') setView('admin');
           else setView('dashboard');
         }
       } catch (e) {
-        console.log("Initialization error (likely network or CORS):", e);
+        console.log("Initialization error:", e);
       } finally {
         setInitLoading(false);
       }
     };
     init();
+
+    return () => {
+        if(document.body.contains(script)) document.body.removeChild(script);
+    }
   }, []);
 
   const fetchData = async () => {
@@ -692,7 +704,6 @@ export default function App() {
       if (uRes) setUser(uRes);
       const oRes = await apiCall('/my-orders');
       if (oRes) setTransactions(oRes.orders || []);
-      // Stay on current view if refreshing
     } catch (e) { console.error(e); }
   };
 
@@ -747,10 +758,8 @@ export default function App() {
           </div>
           <div className="flex-1 p-4 space-y-2">
             
-            {/* --- MENU ITEMS --- */}
             <button onClick={() => {setView('dashboard'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'dashboard' ? 'bg-[#009879] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><LayoutDashboard size={20}/> Dashboard</button>
             
-            {/* --- ADMIN BUTTON (Only shows if role is Admin) --- */}
             {user.role === 'Admin' && (
               <button onClick={() => {setView('admin'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'admin' ? 'bg-red-600 text-white shadow-md' : 'text-red-600 hover:bg-red-50'}`}>
                 <Lock size={20}/> Admin Panel
@@ -777,7 +786,6 @@ export default function App() {
           
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50">
             <div className="max-w-7xl mx-auto w-full">
-              {/* --- VIEW ROUTER --- */}
               {view === 'dashboard' && <Dashboard user={user} transactions={transactions} setView={setView} onTopUp={() => setShowTopUp(true)} />}
               {view === 'admin' && user.role === 'Admin' && <AdminDashboard />}
               {view === 'purchase' && <Purchase refreshUser={fetchData} />}
@@ -791,4 +799,3 @@ export default function App() {
     </>
   );
 }
-
