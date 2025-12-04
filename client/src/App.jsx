@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Wifi, History, LogOut, Menu, X, Wallet, 
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
   Loader2, User, Eye, EyeOff, ShieldCheck, Box,
-  TrendingUp, Users, CreditCard, Activity, Lock
+  TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw
 } from 'lucide-react';
 
 // --- Global Styles ---
@@ -73,13 +73,14 @@ const apiCall = async (endpoint, options = {}) => {
 
 // --- SUB-COMPONENTS ---
 
-const Button = ({ children, onClick, disabled = false, fullWidth = false, variant = 'primary' }) => {
-  const base = "px-4 py-3 rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+const Button = ({ children, onClick, disabled = false, fullWidth = false, variant = 'primary', size = 'default' }) => {
+  const base = `rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-3'}`;
   const variants = {
     primary: "bg-[#009879] text-white hover:bg-[#007a63] shadow-lg shadow-emerald-100",
     outline: "border-2 border-slate-200 text-slate-600 hover:border-[#009879] hover:text-[#009879]",
     dark: "bg-slate-800 text-white hover:bg-slate-900",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100"
+    danger: "bg-red-50 text-red-600 hover:bg-red-100",
+    success: "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
   };
   return <button onClick={onClick} disabled={disabled} className={`${base} ${variants[variant]} ${fullWidth ? 'w-full' : ''}`}>{children}</button>;
 };
@@ -187,50 +188,131 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
 
 const AdminDashboard = () => {
   const [metrics, setMetrics] = useState(null);
+  const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'orders'
 
-  useEffect(() => {
-    // Uses the secret query param you set in the backend code
-    apiCall('/admin/metrics?secret=admin123')
-      .then(data => setMetrics(data))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
-  }, []);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch Metrics
+      const mRes = await apiCall('/admin/metrics?secret=admin123');
+      if (mRes) setMetrics(mRes);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-[#009879]"><Loader2 className="animate-spin" size={40} /></div>;
+      // 2. Fetch All Orders (Requires new backend route)
+      const oRes = await apiCall('/admin/all-orders?secret=admin123');
+      if (oRes && oRes.orders) setAllOrders(oRes.orders);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleStatusUpdate = async (orderId, newStatus) => {
+    if(!window.confirm(`Are you sure you want to change status to ${newStatus}?`)) return;
+    try {
+      const res = await apiCall('/admin/update-order', {
+        method: 'POST',
+        body: JSON.stringify({ id: orderId, status: newStatus, secret: 'admin123' })
+      });
+      if (res && res.success) {
+        alert("Status Updated");
+        fetchData(); // Refresh list
+      } else {
+        alert("Update Failed: " + (res?.error || "Unknown"));
+      }
+    } catch(e) { alert("Network Error"); }
+  };
+
+  if (loading && !metrics) return <div className="min-h-screen flex items-center justify-center text-[#009879]"><Loader2 className="animate-spin" size={40} /></div>;
 
   return (
     <div className="space-y-6 animate-in fade-in pb-20">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-3 bg-red-100 text-red-600 rounded-xl"><Lock size={24} /></div>
-        <h2 className="text-2xl font-bold text-slate-800">Admin Dashboard</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-red-100 text-red-600 rounded-xl"><Lock size={24} /></div>
+          <h2 className="text-2xl font-bold text-slate-800">Admin Dashboard</h2>
+        </div>
+        <div className="flex bg-white p-1 rounded-lg border border-slate-200">
+            <button onClick={() => setActiveTab('overview')} className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'overview' ? 'bg-slate-100 text-slate-900' : 'text-slate-500'}`}>Overview</button>
+            <button onClick={() => setActiveTab('orders')} className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'orders' ? 'bg-slate-100 text-slate-900' : 'text-slate-500'}`}>Manage Orders</button>
+        </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><TrendingUp size={16} /> Revenue</div>
-          <div className="text-3xl font-bold text-[#009879]">GHS {(metrics?.revenue || 0).toFixed(2)}</div>
+      {activeTab === 'overview' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><TrendingUp size={16} /> Revenue</div>
+            <div className="text-3xl font-bold text-[#009879]">GHS {(metrics?.revenue || 0).toFixed(2)}</div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><CreditCard size={16} /> Net Profit</div>
+            <div className="text-3xl font-bold text-blue-600">GHS {(metrics?.netProfit || 0).toFixed(2)}</div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Users size={16} /> Total Users</div>
+            <div className="text-3xl font-bold text-slate-800">{metrics?.userCount || 0}</div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Activity size={16} /> Orders</div>
+            <div className="text-3xl font-bold text-slate-800">{metrics?.totalOrders || 0}</div>
+            </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><CreditCard size={16} /> Net Profit</div>
-          <div className="text-3xl font-bold text-blue-600">GHS {(metrics?.netProfit || 0).toFixed(2)}</div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-700">Recent Orders (Last 50)</h3>
+                <button onClick={fetchData} className="p-2 text-slate-500 hover:bg-white rounded-full"><RefreshCw size={16} /></button>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                        <tr>
+                            <th className="px-4 py-3">Time</th>
+                            <th className="px-4 py-3">User</th>
+                            <th className="px-4 py-3">Plan</th>
+                            <th className="px-4 py-3">Phone</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {allOrders.map(order => (
+                            <tr key={order._id} className="border-b hover:bg-slate-50">
+                                <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                <td className="px-4 py-3 font-medium">{order.userId?.username || 'Unknown'}</td>
+                                <td className="px-4 py-3">{order.dataPlan} ({order.network})</td>
+                                <td className="px-4 py-3">{order.phoneNumber}</td>
+                                <td className="px-4 py-3">
+                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase 
+                                        ${order.status === 'data_sent' ? 'bg-green-100 text-green-700' : 
+                                          order.status === 'failed' || order.status === 'data_failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                        {order.status}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-3 text-right flex justify-end gap-2">
+                                    {order.status !== 'data_sent' && order.status !== 'data_failed' && (
+                                        <>
+                                            <Button size="sm" variant="success" onClick={() => handleStatusUpdate(order._id, 'data_sent')}>
+                                                <Check size={14} /> Send
+                                            </Button>
+                                            <Button size="sm" variant="danger" onClick={() => handleStatusUpdate(order._id, 'data_failed')}>
+                                                <X size={14} /> Fail
+                                            </Button>
+                                        </>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {allOrders.length === 0 && <div className="p-8 text-center text-slate-400">No orders found (or backend not updated).</div>}
+            </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Users size={16} /> Total Users</div>
-          <div className="text-3xl font-bold text-slate-800">{metrics?.userCount || 0}</div>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Activity size={16} /> Orders</div>
-          <div className="text-3xl font-bold text-slate-800">{metrics?.totalOrders || 0}</div>
-        </div>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl">
-        <h3 className="font-bold text-blue-800 mb-2">System Status</h3>
-        <p className="text-sm text-blue-600">
-          The system is currently online. To manage users or verify payments manually, please use your MongoDB Atlas dashboard or the Paystack dashboard.
-        </p>
-      </div>
+      )}
     </div>
   );
 };
