@@ -261,16 +261,15 @@ app.post('/api/purchase', async (req, res) => {
         user.walletBalance -= costPesewas;
         await user.save();
 
-        // --- CK GODSWAY INTEGRATION (Uncomment to use real API) ---
-        // const ckNetworkKey = NETWORK_MAP[network];
-        // const payload = { networkKey: ckNetworkKey, recipient: phone, capacity: planId };
-        // const apiResponse = await axios.post(`${CK_BASE_URL}/data-purchase`, payload, {
-        //     headers: { 'Content-Type': 'application/json', 'X-API-Key': process.env.CK_API_KEY }
-        // });
-        // const result = apiResponse.data;
+        // --- CK GODSWAY INTEGRATION  ---
+         const ckNetworkKey = NETWORK_MAP[network];
+         const payload = { networkKey: ckNetworkKey, recipient: phone, capacity: planId };
+         //This actually buys the data from the provider
+         const apiResponse = await axios.post(`${CK_BASE_URL}/data-purchase`, payload, {
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': process.env.CK_API_KEY }
+         });
+         const result = apiResponse.data;
         
-        // --- MOCK SUCCESS (For now) ---
-        const result = { success: true, data: { orderNumber: `ORD-${Date.now()}` } };
 
         if (result.success) {
             await Order.create({
