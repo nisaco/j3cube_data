@@ -22,6 +22,12 @@ const globalStyles = `
 const API_BASE_URL = 'https://j3cube-data.onrender.com/api';
 const PAYSTACK_KEY = "pk_live_62dc43eeea153c81c216b75e3967f8a44ee94fc3"; 
 
+const NETWORK_LOGOS = {
+  'MTN': 'mtn_logo.png',
+  'AirtelTigo': 'at_logo.jpg',
+  'Telecel': 'telecel_logo.png'
+};
+
 // --- API HELPER ---
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -281,7 +287,7 @@ const Purchase = ({ refreshUser }) => {
         <div className="grid grid-cols-3 gap-3 mb-6">
           {Object.keys(plans).length > 0 ? Object.keys(plans).map((net) => (
             <button key={net} onClick={() => { setNetwork(net); setPlanId(''); }} className={`h-24 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${network === net ? 'border-[#009879] bg-emerald-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
-              <span className={`font-bold text-xs ${network === net ? 'text-[#009879]' : 'text-slate-500'}`}>{net}</span>
+              <img src={NETWORK_LOGOS[net]} alt={net} className="h-12 w-auto object-contain" />
             </button>
           )) : <div className="col-span-3 text-center py-4 text-slate-400">Loading plans...</div>}
         </div>
@@ -426,7 +432,7 @@ const Auth = ({ onLogin, mode, setMode }) => {
             {isAdminMode ? <Lock size={32} /> : (mode === 'login' ? <User size={32} /> : <ShieldCheck size={32} />)}
           </div>
           <h1 className="text-3xl font-bold text-slate-800">
-            {isAdminMode ? 'Admin Portal' : (mode === 'login' ? 'Welcome Back' : 'Join AJEnterprise')}
+            {isAdminMode ? 'Admin Portal' : (mode === 'login' ? 'Welcome Back' : 'Join J3Cube')}
           </h1>
           <p className="text-slate-500 mt-2">
             {isAdminMode ? 'Restricted Access' : 'Premium Data Vending Platform'}
@@ -642,7 +648,7 @@ export default function App() {
         <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r flex flex-col transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="p-6 border-b flex items-center gap-3">
             <div className="w-10 h-10 bg-[#009879] rounded-xl flex items-center justify-center text-white font-bold"><Box size={24} /></div>
-            <div><h2 className="font-bold text-lg">AJEnterprise</h2><p className="text-xs text-slate-400">v2.0 Premium</p></div>
+            <div><h2 className="font-bold text-lg">J3Cube</h2><p className="text-xs text-slate-400">v2.0 Premium</p></div>
           </div>
           <div className="flex-1 p-4 space-y-2">
             
