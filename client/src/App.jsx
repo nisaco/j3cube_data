@@ -461,6 +461,12 @@ const Auth = ({ onLogin, mode, setMode }) => {
 
   const handleAgentUpgrade = async (cleanData) => {
     try {
+      // Safety check: Ensure script loaded
+      if (!window.PaystackPop) {
+        alert("Payment System loading... Please wait 3 seconds and try again.");
+        return;
+      }
+
       const signupRes = await apiCall('/signup', {
         method: 'POST', body: JSON.stringify(cleanData)
       });
@@ -470,7 +476,7 @@ const Auth = ({ onLogin, mode, setMode }) => {
         method: 'POST', body: JSON.stringify({ username: cleanData.username, password: cleanData.password }) 
       });
 
-      const handler = window.PaystackPop && window.PaystackPop.setup({
+      const handler = window.PaystackPop.setup({
         key: PAYSTACK_KEY,
         email: cleanData.email,
         amount: 1500, // 15 GHS
@@ -493,8 +499,7 @@ const Auth = ({ onLogin, mode, setMode }) => {
         }
       });
       
-      if(handler) handler.openIframe();
-      else alert("Paystack SDK not loaded. Check internet.");
+      handler.openIframe();
 
     } catch (err) {
       setError(err.message);
@@ -576,7 +581,6 @@ const TopUpModal = ({ isOpen, onClose, onConfirm }) => {
 
   const handleSubmit = () => {
     if (!amount || isNaN(amount) || amount < 1) return;
-    setProcessing(true);
     
     // Safety check: Ensure script loaded
     if (!window.PaystackPop) {
@@ -602,7 +606,7 @@ const TopUpModal = ({ isOpen, onClose, onConfirm }) => {
       }
     });
     
-    if (handler) handler.openIframe();
+    handler.openIframe();
   };
 
   return (
