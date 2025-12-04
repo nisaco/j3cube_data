@@ -312,7 +312,7 @@ app.get('/api/my-orders', async (req, res) => {
 
 // --- ADMIN: METRICS ---
 app.get('/api/admin/metrics', async (req, res) => {
-    if (req.query.secret !== (process.env.ADMIN_SECRET || 'admin123')) return res.status(403).json({ error: 'Unauthorized' });
+    if (req.query.secret !== (process.env.ADMIN_SECRET || 'n11kpakpo')) return res.status(403).json({ error: 'Unauthorized' });
     try {
         const totalOrders = await Order.countDocuments({});
         const userCount = await User.countDocuments({});
@@ -327,7 +327,7 @@ app.get('/api/admin/metrics', async (req, res) => {
 
 // --- ADMIN: GET ALL ORDERS ---
 app.get('/api/admin/all-orders', async (req, res) => {
-    if (req.query.secret !== (process.env.ADMIN_SECRET || 'admin123')) return res.status(403).json({ error: 'Unauthorized' });
+    if (req.query.secret !== (process.env.ADMIN_SECRET || 'n11kpakpo')) return res.status(403).json({ error: 'Unauthorized' });
     try {
         const orders = await Order.find().sort({ createdAt: -1 }).limit(50).populate('userId', 'username');
         res.json({ orders });
@@ -337,7 +337,7 @@ app.get('/api/admin/all-orders', async (req, res) => {
 // --- ADMIN: UPDATE ORDER ---
 app.post('/api/admin/update-order', async (req, res) => {
     const { id, status, secret } = req.body;
-    if (secret !== (process.env.ADMIN_SECRET || 'admin123')) return res.status(403).json({ error: 'Unauthorized' });
+    if (secret !== (process.env.ADMIN_SECRET ||'n11kpakpo')) return res.status(403).json({ error: 'Unauthorized' });
 
     try {
         const order = await Order.findById(id);
@@ -363,3 +363,4 @@ app.get('/api/logout', (req, res) => req.session.destroy(() => res.json({ messag
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'client/dist', 'index.html')));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
