@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Wifi, History, LogOut, Menu, X, Wallet, 
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
   Loader2, User, Eye, EyeOff, ShieldCheck, Box,
-  TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw
+  TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw, Landmark
 } from 'lucide-react';
 
 // --- Global Styles ---
@@ -195,10 +195,10 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const mRes = await apiCall('/admin/metrics?secret=admin123');
+      const mRes = await apiCall('/admin/metrics');
       if (mRes) setMetrics(mRes);
 
-      const oRes = await apiCall('/admin/all-orders?secret=admin123');
+      const oRes = await apiCall('/admin/all-orders');
       if (oRes && oRes.orders) setAllOrders(oRes.orders);
     } catch (err) {
       console.error(err);
@@ -214,7 +214,7 @@ const AdminDashboard = () => {
     try {
       const res = await apiCall('/admin/update-order', {
         method: 'POST',
-        body: JSON.stringify({ id: orderId, status: newStatus, secret: 'admin123' })
+        body: JSON.stringify({ id: orderId, status: newStatus })
       });
       if (res && res.success) {
         alert("Status Updated");
@@ -242,21 +242,28 @@ const AdminDashboard = () => {
       
       {activeTab === 'overview' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. SALES REVENUE */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><TrendingUp size={16} /> Revenue</div>
-            <div className="text-3xl font-bold text-[#009879]">GHS {(metrics?.revenue || 0).toFixed(2)}</div>
+                <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><TrendingUp size={16} /> Sales Revenue</div>
+                <div className="text-3xl font-bold text-[#009879]">GHS {(metrics?.revenue || 0).toFixed(2)}</div>
             </div>
+            
+            {/* 2. TOTAL DEPOSITS */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><CreditCard size={16} /> Net Profit</div>
-            <div className="text-3xl font-bold text-blue-600">GHS {(metrics?.netProfit || 0).toFixed(2)}</div>
+                <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Landmark size={16} /> Total Deposits</div>
+                <div className="text-3xl font-bold text-blue-600">GHS {(metrics?.totalDeposits || 0).toFixed(2)}</div>
             </div>
+
+            {/* 3. TOTAL USERS */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Users size={16} /> Total Users</div>
-            <div className="text-3xl font-bold text-slate-800">{metrics?.userCount || 0}</div>
+                <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Users size={16} /> Total Users</div>
+                <div className="text-3xl font-bold text-slate-800">{metrics?.userCount || 0}</div>
             </div>
+
+            {/* 4. TOTAL ORDERS */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Activity size={16} /> Orders</div>
-            <div className="text-3xl font-bold text-slate-800">{metrics?.totalOrders || 0}</div>
+                <div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Activity size={16} /> Orders</div>
+                <div className="text-3xl font-bold text-slate-800">{metrics?.totalOrders || 0}</div>
             </div>
         </div>
       ) : (
@@ -287,12 +294,13 @@ const AdminDashboard = () => {
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase 
                                         ${order.status === 'data_sent' ? 'bg-green-100 text-green-700' : 
+                                          order.status === 'topup_successful' ? 'bg-blue-100 text-blue-700' :
                                           order.status === 'failed' || order.status === 'data_failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                        {order.status}
+                                        {order.status === 'topup_successful' ? 'Wallet Deposit' : order.status}
                                     </span>
                                 </td>
                                 <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                    {order.status !== 'data_sent' && order.status !== 'data_failed' && (
+                                    {order.status !== 'data_sent' && order.status !== 'data_failed' && order.status !== 'topup_successful' && (
                                         <>
                                             <Button size="sm" variant="success" onClick={() => handleStatusUpdate(order._id, 'data_sent')}>
                                                 <Check size={14} /> Send
@@ -464,6 +472,7 @@ const Auth = ({ onLogin, mode, setMode }) => {
       // Safety check: Ensure script loaded
       if (!window.PaystackPop) {
         alert("Payment System loading... Please wait 3 seconds and try again.");
+        setLoading(false); // Reset loading state
         return;
       }
 
@@ -762,8 +771,10 @@ export default function App() {
           </div>
           <div className="flex-1 p-4 space-y-2">
             
+            {/* --- MENU ITEMS --- */}
             <button onClick={() => {setView('dashboard'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'dashboard' ? 'bg-[#009879] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><LayoutDashboard size={20}/> Dashboard</button>
             
+            {/* --- ADMIN BUTTON (Only shows if role is Admin) --- */}
             {user.role === 'Admin' && (
               <button onClick={() => {setView('admin'); setSidebarOpen(false);}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition ${view === 'admin' ? 'bg-red-600 text-white shadow-md' : 'text-red-600 hover:bg-red-50'}`}>
                 <Lock size={20}/> Admin Panel
@@ -776,7 +787,7 @@ export default function App() {
           <div className="p-4 border-t"><button onClick={handleLogout} className="flex items-center gap-2 text-red-500 font-bold p-2 hover:bg-red-50 w-full rounded-lg transition"><LogOut size={20} /> Sign Out</button></div>
         </aside>
 
-        <main className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
+        <main className="flex-1 flex flex-col h-full overflow-hidden w-full relative lg:ml-72">
           <header className="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8 shrink-0 z-30 sticky top-0">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-500"><Menu /></button>
             <div className="flex items-center gap-3 ml-auto">
@@ -790,6 +801,7 @@ export default function App() {
           
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50">
             <div className="max-w-7xl mx-auto w-full">
+              {/* --- VIEW ROUTER --- */}
               {view === 'dashboard' && <Dashboard user={user} transactions={transactions} setView={setView} onTopUp={() => setShowTopUp(true)} />}
               {view === 'admin' && user.role === 'Admin' && <AdminDashboard />}
               {view === 'purchase' && <Purchase refreshUser={fetchData} />}
