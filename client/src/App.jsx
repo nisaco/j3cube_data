@@ -25,7 +25,7 @@ const FAVICON_URL = 'apple-touch-icon.png'; // J3Cube Logo
 
 const NETWORK_LOGOS = {
   'MTN': 'mtn_logo.png',
-  'AirtelTigo': 'at_logo.jpg',
+  'AirtelTigo': 'at_logo.png',
   'Telecel': 'telecel_logo.png'
 };
 
@@ -871,3 +871,4 @@ export default function App() {
     </>
   );
 }
+
