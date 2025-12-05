@@ -25,7 +25,7 @@ const FAVICON_URL = 'apple-touch-icon.png'; // J3Cube Logo
 
 const NETWORK_LOGOS = {
   'MTN': 'mtn_logo.png',
-  'AirtelTigo': 'at_logo.png',
+  'AirtelTigo': 'at_logo.jpg',
   'Telecel': 'telecel_logo.png'
 };
 
@@ -805,7 +805,63 @@ export default function App() {
               {view === 'dashboard' && <Dashboard user={user} transactions={transactions} setView={setView} onTopUp={() => setShowTopUp(true)} />}
               {view === 'admin' && user.role === 'Admin' && <AdminDashboard />}
               {view === 'purchase' && <Purchase refreshUser={fetchData} />}
-              {view === 'history' && <div className="bg-white rounded-2xl p-6 shadow-sm"><h2 className="font-bold mb-4">History</h2>{transactions.map(t => <div key={t._id} className="p-3 border-b flex justify-between last:border-0"><span>{t.dataPlan}</span><b>GHS {t.amount}</b></div>)}</div>}
+              {view === 'history' && (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-slate-100">
+                    <h2 className="text-xl font-bold text-slate-800">Transaction History</h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                        <tr>
+                          <th className="px-6 py-3">Date</th>
+                          <th className="px-6 py-3">Description</th>
+                          <th className="px-6 py-3">Recipient</th>
+                          <th className="px-6 py-3">Status</th>
+                          <th className="px-6 py-3 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                              No transactions found.
+                            </td>
+                          </tr>
+                        ) : (
+                          transactions.map((t) => (
+                            <tr key={t._id} className="border-b hover:bg-slate-50 last:border-0">
+                              <td className="px-6 py-4 whitespace-nowrap text-slate-500">
+                                {new Date(t.createdAt).toLocaleDateString()}
+                                <div className="text-xs text-slate-400">{new Date(t.createdAt).toLocaleTimeString()}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-bold text-slate-700">{t.dataPlan}</div>
+                                <div className="text-xs text-slate-500">{t.network}</div>
+                              </td>
+                              <td className="px-6 py-4 text-slate-600 font-mono text-xs">
+                                {t.phoneNumber}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
+                                  ${t.status === 'data_sent' || t.status === 'success' ? 'bg-green-100 text-green-700' : 
+                                    t.status === 'topup_successful' ? 'bg-blue-100 text-blue-700' :
+                                    t.status === 'failed' || t.status === 'data_failed' ? 'bg-red-100 text-red-700' : 
+                                    'bg-yellow-100 text-yellow-700'}`}>
+                                  {t.status === 'topup_successful' ? 'Deposit' : t.status.replace(/_/g, ' ')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right font-bold text-slate-800">
+                                GHS {t.amount.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>
