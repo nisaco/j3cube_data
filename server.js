@@ -18,14 +18,14 @@ const PORT = process.env.PORT || 10000;
 // --- CONFIGURATION ---
 const AGENT_FEE_GHS = 15.00;
 
-// ⚠️ UPDATED BASE URL BASED ON DOCS
-const CK_BASE_URL = 'https://console.ckgodsway.com/api/external'; 
+// ✅ CORRECTED BASE URL (Based on Documentation)
+const CK_BASE_URL = 'https://console.ckgodsway.com/api'; 
 
-// ⚠️ UPDATED NETWORK IDs (Based on "MTN" appearing in error logs)
+// ✅ CORRECTED NETWORK KEYS (Based on Documentation)
 const NETWORK_MAP = {
-    'MTN': 'MTN',         
-    'AirtelTigo': 'AirtelTigo',  
-    'Telecel': 'Telecel'      
+    'MTN': 'YELLO',         
+    'AirtelTigo': 'AT_PREMIUM',  
+    'Telecel': 'TELECEL'      
 };
 
 const PRICING = {
@@ -180,7 +180,7 @@ app.post('/api/verify-topup', async (req, res) => {
     } catch (e) { res.status(500).json({ message: 'Server error' }); }
 });
 
-// --- SAFE PURCHASE ROUTE (With Auto-Refund) ---
+// --- SAFE PURCHASE ROUTE (With Auto-Refund & Corrected Payload) ---
 app.post('/api/purchase', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     const { network, planId, phone } = req.body;
@@ -217,38 +217,36 @@ app.post('/api/purchase', async (req, res) => {
 
         // --- STEP 3: CALL API ---
         try {
-            // MAPPING: Updated based on docs
-            const ckNetwork = NETWORK_MAP[network]; 
-            // Docs imply payload requires 'network', 'mobile_number', 'plan' etc.
-            // Using standard payload structure for CKGodsway/Husmo style
+            // MAPPING: Updated based on CK Godsway Documentation
+            const ckNetworkKey = NETWORK_MAP[network]; 
+            // Docs require just the number string for capacity (e.g., '1GB' -> '1')
+            const cleanCapacity = planId.replace(/[A-Za-z]/g, '');
+
             const payload = { 
-                network: ckNetwork, 
-                mobile_number: phone, 
-                plan: planId, // Assuming planId is like '1GB' as per PRICING
-                Ported_number: true
+                networkKey: ckNetworkKey, // Must be 'YELLO', 'AT_PREMIUM', or 'TELECEL'
+                recipient: phone,
+                capacity: cleanCapacity   // Must be '1', '2', etc.
             };
             
             console.log("Sending to DataHub:", payload);
 
-            // Using /buy based on standard practice for this API structure (since status is at /order-status)
-            // If this fails, the error log will now be very clear.
-            const apiResponse = await axios.post(`${CK_BASE_URL}/buy`, payload, {
+            const apiResponse = await axios.post(`${CK_BASE_URL}/data-purchase`, payload, {
                 headers: { 
-                    'Authorization': `Token ${process.env.CK_API_KEY}`, 
-                    'X-API-Key': process.env.CK_API_KEY, // Sending both to be safe
-                    'Content-Type': 'application/json' 
+                    'Content-Type': 'application/json',
+                    'X-API-Key': process.env.CK_API_KEY // Correct Header
                 }
             });
             const result = apiResponse.data;
 
-            // Updated Success Check based on Docs: { "success": true }
+            // Docs say: { "success": true, ... }
             if (result.success === true) { 
+                // Success! Update Order
                 newOrder.status = 'data_sent';
+                // Use reference from API response if available, else standard fallback
                 newOrder.reference = result.data?.reference || `ORD-${Date.now()}`;
                 await newOrder.save();
                 res.json({ status: 'success', message: 'Data sent successfully!' });
             } else {
-                // If API returns success:false, treat as error
                 throw new Error(result.error || result.message || "API returned failure");
             }
         } catch (apiError) {
@@ -289,7 +287,7 @@ app.get('/api/my-orders', async (req, res) => {
     res.json({ orders });
 });
 
-// ADMIN METRICS
+// ADMIN METRICS (No Secret Check, just Role Check)
 app.get('/api/admin/metrics', async (req, res) => {
     if (!req.session.user || req.session.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
     try {
