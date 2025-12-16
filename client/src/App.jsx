@@ -4,7 +4,7 @@ import {
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
   Loader2, User, Eye, EyeOff, ShieldCheck, Box,
   TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw, Landmark,
-  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen, Tag, Calendar, Hash
+  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen, Tag, Calendar, Hash, Signal
 } from 'lucide-react';
 
 // --- Global Styles ---
@@ -15,9 +15,8 @@ const globalStyles = `
   .hover-scale { transition: transform 0.2s ease; }
   .hover-scale:hover { transform: scale(1.01); }
   .btn-press:active { transform: scale(0.95); }
-  input, select { font-size: 16px !important; } /* Prevents zoom on iOS */
+  input, select { font-size: 16px !important; } 
   
-  /* Custom Scrollbar for Code Blocks */
   .code-scroll::-webkit-scrollbar { height: 8px; }
   .code-scroll::-webkit-scrollbar-track { background: #1e293b; }
   .code-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -27,7 +26,7 @@ const globalStyles = `
 const API_BASE_URL = 'https://j3cube-data.onrender.com/api'; 
 const PAYSTACK_KEY = "pk_live_62dc43eeea153c81c216b75e3967f8a44ee94fc3"; 
 const FAVICON_URL = 'apple-touch-icon.png';
-const NETWORK_LOGOS = { 'MTN': 'mtn_logo.png', 'AirtelTigo': 'at_logo.jpg', 'Telecel': 'telecel_logo.png' };
+const NETWORK_LOGOS = { 'MTN': 'mtn_logo.png', 'AirtelTigo': 'at_logo.png', 'Telecel': 'telecel_logo.png' };
 
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -50,7 +49,7 @@ const apiCall = async (endpoint, options = {}) => {
 // --- HELPERS ---
 const SourceBadge = ({ method }) => {
     const isApi = method === 'api_wallet';
-    return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{isApi ? 'API' : 'WEB'}</span>;
+    return <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{isApi ? 'API' : 'WEB'}</span>;
 };
 
 const StatusBadge = ({ status }) => {
@@ -62,49 +61,62 @@ const StatusBadge = ({ status }) => {
     return <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${colorClass}`}>{label}</span>;
 };
 
-// ✅ NEW: Clean Mobile Transaction Card (CK Style)
+// ✅ NEW: DETAILED TICKET-STYLE CARD
 const TransactionCard = ({ tx }) => {
     const isDeposit = tx.status === 'topup_successful';
-    const isSuccess = tx.status === 'data_sent' || tx.status === 'success' || isDeposit;
-    const isPending = tx.status === 'pending_review' || tx.status === 'processing';
     
-    let statusColor = isSuccess ? 'text-green-600' : (isPending ? 'text-yellow-600' : 'text-red-600');
-    let iconBg = isSuccess ? 'bg-green-50 text-green-600' : (isPending ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600');
-    let Icon = isSuccess ? ArrowDownLeft : ArrowUpRight;
-    let statusLabel = isSuccess ? 'Success' : (isPending ? 'Processing' : 'Failed');
-
-    if (isDeposit) {
-        iconBg = 'bg-blue-50 text-blue-600'; Icon = Wallet; statusLabel = 'Funded'; statusColor = 'text-blue-600';
-    }
+    // Network Color Coding
+    let netColor = 'bg-slate-300';
+    if (tx.network === 'MTN') netColor = 'bg-yellow-400';
+    if (tx.network === 'Telecel') netColor = 'bg-red-500';
+    if (tx.network === 'AirtelTigo') netColor = 'bg-blue-600';
+    if (isDeposit) netColor = 'bg-emerald-500';
 
     const dateObj = new Date(tx.createdAt);
-    const dateStr = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const dateStr = dateObj.toLocaleDateString();
     const timeStr = dateObj.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
     return (
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between gap-4 hover-scale shadow-sm">
-        {/* LEFT: Icon and Details */}
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center ${iconBg}`}>
-            <Icon size={24} strokeWidth={2} />
-          </div>
-          <div>
-            <h4 className="font-bold text-slate-800 text-[15px] mb-1">{tx.dataPlan || (isDeposit ? 'Wallet Topup' : 'Transaction')}</h4>
-            <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-              <span>{dateStr}, {timeStr}</span>
-              <SourceBadge method={tx.paymentMethod} />
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden hover-scale mb-3">
+        {/* Color Bar */}
+        <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${netColor}`}></div>
+        
+        <div className="p-4 pl-6">
+            {/* Header: Network/Type & Amount */}
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                    <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        {isDeposit ? 'Wallet Deposit' : tx.network}
+                        {!isDeposit && <span className="text-xs font-normal text-slate-400 px-1.5 py-0.5 bg-slate-50 rounded border border-slate-100">{tx.dataPlan}</span>}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {tx.reference}</p>
+                </div>
+                <div className="text-right">
+                    <p className={`font-bold text-xl ${isDeposit ? 'text-blue-600' : 'text-slate-800'}`}>
+                        {isDeposit ? '+' : '-'}GHS {tx.amount?.toFixed(2)}
+                    </p>
+                </div>
             </div>
-          </div>
-        </div>
 
-        {/* RIGHT: Amount and Status Text */}
-        <div className="text-right shrink-0">
-          <p className={`font-bold text-lg ${isDeposit ? 'text-blue-600' : 'text-slate-800'}`}>
-              {isDeposit ? '+' : '-'}GHS {tx.amount?.toFixed(2)}
-          </p>
-          <p className={`text-[11px] font-bold uppercase tracking-wider ${statusColor}`}>
-              {statusLabel}
-          </p>
+            {/* Details Grid */}
+            {!isDeposit && (
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm mb-4 border-t border-slate-50 pt-3">
+                    <div>
+                        <p className="text-xs text-slate-400 mb-0.5 flex items-center gap-1"><Smartphone size={12}/> Phone Number</p>
+                        <p className="font-mono font-medium text-slate-700 tracking-wide">{tx.phoneNumber}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs text-slate-400 mb-0.5 flex items-center justify-end gap-1"><Calendar size={12}/> Date & Time</p>
+                        <p className="font-medium text-slate-600">{dateStr} <span className="text-[10px]">{timeStr}</span></p>
+                    </div>
+                </div>
+            )}
+
+            {/* Footer: Status & Source */}
+            <div className={`flex justify-between items-center ${isDeposit ? 'mt-1' : 'pt-1'}`}>
+                <StatusBadge status={tx.status} />
+                <SourceBadge method={tx.paymentMethod} />
+            </div>
         </div>
       </div>
     );
@@ -190,7 +202,7 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
       <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-slate-800">Recent Transactions</h3></div>
       
       {/* ✅ NEW MOBILE CARDS */}
-      <div className="space-y-3 md:hidden">
+      <div className="space-y-1 md:hidden">
         {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
             <TransactionCard key={tx._id} tx={tx} />
         )) : <div className="p-8 text-center text-slate-400 text-sm bg-white rounded-xl">No recent transactions</div>}
@@ -223,6 +235,7 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
   </div>
 );
 
+// ... (DeveloperConsole, Purchase, AdminDashboard, Auth - Keep as previously provided, they don't need changes for this request)
 const DeveloperConsole = ({ user }) => {
   const [apiKey, setApiKey] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -490,7 +503,7 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <>
-        {/* ✅ NEW MOBILE CARD VIEW FOR ADMIN */}
+        {/* MOBILE CARD VIEW FOR ADMIN */}
         <div className="space-y-3 md:hidden">
             {allOrders.map(order => (
                 <div key={order._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3">
@@ -546,7 +559,6 @@ const AdminDashboard = () => {
   );
 };
 
-// ... (Auth component remains same as previous, just ensure it is included)
 const Auth = ({ onLogin, mode, setMode }) => {
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -668,7 +680,7 @@ export default function App() {
                 <div className="bg-white md:rounded-2xl md:p-6 md:shadow-sm">
                     <h2 className="font-bold mb-4 hidden md:block">History</h2>
                     {/* ✅ NEW MOBILE CARDS */}
-                    <div className="space-y-3 md:hidden">
+                    <div className="space-y-1 md:hidden">
                         {transactions.map(tx => (
                             <TransactionCard key={tx._id} tx={tx} />
                         ))}
