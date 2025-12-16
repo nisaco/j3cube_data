@@ -4,7 +4,7 @@ import {
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
   Loader2, User, Eye, EyeOff, ShieldCheck, Box,
   TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw, Landmark,
-  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen, Tag
+  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen, Tag, Calendar, Hash
 } from 'lucide-react';
 
 // --- Global Styles ---
@@ -52,6 +52,32 @@ const SourceBadge = ({ method }) => {
     return (
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ml-2 ${isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
             {isApi ? 'API' : 'WEB'}
+        </span>
+    );
+};
+
+// --- HELPER: Status Badge ---
+const StatusBadge = ({ status }) => {
+    let colorClass = 'bg-gray-100 text-gray-600';
+    let label = status;
+
+    if (status === 'data_sent' || status === 'success') {
+        colorClass = 'bg-green-100 text-green-700';
+        label = 'Completed';
+    } else if (status === 'pending_review' || status === 'processing') {
+        colorClass = 'bg-yellow-100 text-yellow-700';
+        label = 'Processing';
+    } else if (status === 'data_failed' || status === 'failed') {
+        colorClass = 'bg-red-100 text-red-700';
+        label = 'Failed';
+    } else if (status === 'topup_successful') {
+        colorClass = 'bg-blue-100 text-blue-700';
+        label = 'Deposit';
+    }
+
+    return (
+        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${colorClass}`}>
+            {label}
         </span>
     );
 };
@@ -134,7 +160,33 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
 
     <div>
       <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-slate-800">Recent Transactions</h3></div>
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      
+      {/* 1. MOBILE VIEW: CARDS (Visible on small screens) */}
+      <div className="space-y-3 md:hidden">
+        {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
+            <div key={tx._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.status === 'data_sent' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                            {tx.status === 'data_sent' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+                        </div>
+                        <div>
+                            <p className="font-bold text-slate-800 text-sm">{tx.dataPlan || 'Transaction'}</p>
+                            <p className="text-xs text-slate-400">{new Date(tx.createdAt).toLocaleString()}</p>
+                        </div>
+                    </div>
+                    <StatusBadge status={tx.status} />
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-50 pt-3">
+                    <SourceBadge method={tx.paymentMethod} />
+                    <p className="font-bold text-lg text-slate-800">GHS {tx.amount?.toFixed(2)}</p>
+                </div>
+            </div>
+        )) : <div className="p-8 text-center text-slate-400 text-sm bg-white rounded-xl">No recent transactions</div>}
+      </div>
+
+      {/* 2. DESKTOP VIEW: LIST (Visible on md+ screens) */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
           <div key={tx._id} className="p-4 border-b border-slate-50 flex items-center justify-between last:border-0 hover:bg-slate-50 transition">
             <div className="flex items-center gap-4">
@@ -144,7 +196,6 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
               <div>
                   <p className="font-bold text-slate-700 text-sm flex items-center">
                       {tx.dataPlan || 'Transaction'} 
-                      {/* ✅ ADDED: Source Badge */}
                       <SourceBadge method={tx.paymentMethod} />
                   </p>
                   <p className="text-xs text-slate-400">{new Date(tx.createdAt).toLocaleDateString()}</p>
@@ -152,9 +203,7 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
             </div>
             <div className="text-right">
                 <p className="font-bold text-sm text-slate-800">GHS {tx.amount?.toFixed(2)}</p>
-                <p className={`text-[10px] uppercase font-bold ${tx.status === 'data_sent' ? 'text-green-600' : 'text-yellow-600'}`}>
-                    {tx.status === 'data_sent' ? 'Completed' : (tx.status === 'pending_review' ? 'Processing' : tx.status)}
-                </p>
+                <div className="flex justify-end mt-1"><StatusBadge status={tx.status} /></div>
             </div>
           </div>
         )) : <div className="p-8 text-center text-slate-400 text-sm">No recent transactions</div>}
@@ -163,7 +212,6 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
   </div>
 );
 
-// ✅ NEW: PROFESSIONAL DEVELOPER CONSOLE WITH PYTHON & CURL
 const DeveloperConsole = ({ user }) => {
   const [apiKey, setApiKey] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -187,15 +235,9 @@ $curl = curl_init();
 curl_setopt_array($curl, array(
   CURLOPT_URL => 'https://j3cube-data.onrender.com/api/v1/purchase',
   CURLOPT_RETURNTRANSFER => true,
-  CURLOPT_ENCODING => '',
-  CURLOPT_MAXREDIRS => 10,
-  CURLOPT_TIMEOUT => 0,
-  CURLOPT_FOLLOWLOCATION => true,
-  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
   CURLOPT_CUSTOMREQUEST => 'POST',
   CURLOPT_POSTFIELDS =>'{
-    "network": "MTN",
-    "planId": "1GB",
+    "network": "MTN", "planId": "1GB",
     "phone": "0541234567",
     "reference": "REF-${Math.floor(Math.random()*10000)}"
   }',
@@ -205,77 +247,42 @@ curl_setopt_array($curl, array(
   ),
 ));
 $response = curl_exec($curl);
-curl_close($curl);
 echo $response;`;
 
   const nodeCode = `
 const axios = require('axios');
-const data = JSON.stringify({
-  "network": "MTN",
-  "planId": "1GB",
+const data = {
+  "network": "MTN", "planId": "1GB",
   "phone": "0541234567",
   "reference": "unique_ref_123"
-});
-
-const config = {
-  method: 'post',
-  url: 'https://j3cube-data.onrender.com/api/v1/purchase',
-  headers: { 
-    'Content-Type': 'application/json', 
-    'x-api-key': 'YOUR_API_KEY'
-  },
-  data : data
 };
-
-axios(config)
-.then(function (response) {
-  console.log(JSON.stringify(response.data));
-})
-.catch(function (error) {
-  console.log(error);
-});`;
+axios.post('https://j3cube-data.onrender.com/api/v1/purchase', data, {
+  headers: { 'Content-Type': 'application/json', 'x-api-key': 'YOUR_API_KEY' }
+}).then(res => console.log(res.data));`;
 
   const pythonCode = `
 import requests
 import json
-import random
-
 url = "https://j3cube-data.onrender.com/api/v1/purchase"
-
 payload = json.dumps({
-  "network": "MTN",
-  "planId": "1GB",
-  "phone": "0541234567",
-  "reference": f"REF-{random.randint(1000, 9999)}"
+  "network": "MTN", "planId": "1GB",
+  "phone": "0541234567", "reference": "REF-123"
 })
-headers = {
-  'Content-Type': 'application/json',
-  'x-api-key': 'YOUR_API_KEY'
-}
-
-response = requests.request("POST", url, headers=headers, data=payload)
-
-print(response.text)`;
+headers = { 'Content-Type': 'application/json', 'x-api-key': 'YOUR_API_KEY' }
+print(requests.post(url, headers=headers, data=payload).text)`;
 
   const curlCode = `
 curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
 --header 'Content-Type: application/json' \\
 --header 'x-api-key: YOUR_API_KEY' \\
---data '{
-    "network": "MTN",
-    "planId": "1GB",
-    "phone": "0541234567",
-    "reference": "unique_ref_123"
-}'`;
+--data '{ "network": "MTN", "planId": "1GB", "phone": "0541234567", "reference": "ref_123" }'`;
 
   return (
     <div className="space-y-6 animate-fade-in pb-20">
-      {/* HEADER CARD */}
       <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
         <div className="relative z-10">
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3"><Terminal className="text-green-400" /> Developer Console</h1>
             <p className="text-slate-400 mb-6">Build your own data business using our robust API.</p>
-            
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="overflow-hidden w-full">
                     <p className="text-xs text-slate-500 font-bold uppercase mb-1">Your Live API Key</p>
@@ -286,7 +293,7 @@ curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
                 <div className="flex gap-2 shrink-0 w-full md:w-auto">
                     {apiKey && <button onClick={copyToClipboard} className="flex-1 md:flex-none p-3 bg-slate-700 hover:bg-slate-600 rounded-lg transition text-slate-300 flex justify-center"><Copy size={20} /></button>}
                     <button onClick={generateKey} disabled={loading} className="flex-1 md:flex-none p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-bold text-sm px-6">
-                        {loading ? 'Generating...' : (apiKey ? 'Regenerate Key' : 'Generate Key')}
+                        {loading ? '...' : (apiKey ? 'Regenerate Key' : 'Generate Key')}
                     </button>
                 </div>
             </div>
@@ -294,10 +301,10 @@ curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="flex border-b border-slate-100">
-            <button onClick={()=>setActiveTab('overview')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'overview' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Overview & Auth</button>
-            <button onClick={()=>setActiveTab('endpoints')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'endpoints' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Endpoints</button>
-            <button onClick={()=>setActiveTab('errors')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'errors' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Errors & Codes</button>
+        <div className="flex border-b border-slate-100 overflow-x-auto">
+            <button onClick={()=>setActiveTab('overview')} className={`flex-shrink-0 px-6 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'overview' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Overview</button>
+            <button onClick={()=>setActiveTab('endpoints')} className={`flex-shrink-0 px-6 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'endpoints' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Endpoints</button>
+            <button onClick={()=>setActiveTab('errors')} className={`flex-shrink-0 px-6 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'errors' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Errors</button>
         </div>
 
         <div className="p-6 md:p-8">
@@ -305,16 +312,12 @@ curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
                 <div className="space-y-8 animate-fade-in">
                     <div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">Authentication</h3>
-                        <p className="text-slate-500 text-sm leading-relaxed mb-4">
-                            All API requests must be authenticated using your unique API Key. 
-                            Pass this key in the request header <code className="bg-slate-100 px-2 py-1 rounded text-slate-700 font-mono">x-api-key</code>.
-                        </p>
-                        <CodeBlock label="Header Example" code={`Authorization: Bearer YOUR_API_KEY\n-- OR --\nx-api-key: YOUR_API_KEY`} />
+                        <p className="text-slate-500 text-sm leading-relaxed mb-4">Pass your key in the request header <code className="bg-slate-100 px-2 py-1 rounded text-slate-700 font-mono">x-api-key</code>.</p>
+                        <CodeBlock label="Header Example" code={`x-api-key: YOUR_API_KEY`} />
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">Base URL</h3>
-                        <p className="text-slate-500 text-sm mb-2">All requests should be made to:</p>
-                        <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 font-mono text-sm text-slate-600">
+                        <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 font-mono text-sm text-slate-600 break-all">
                             https://j3cube-data.onrender.com/api/v1
                         </div>
                     </div>
@@ -323,68 +326,30 @@ curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
 
             {activeTab === 'endpoints' && (
                 <div className="space-y-10 animate-fade-in">
-                    {/* BALANCE ENDPOINT */}
                     <div>
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold text-xs">GET</span>
-                            <h3 className="text-lg font-bold text-slate-800">/balance</h3>
-                        </div>
-                        <p className="text-slate-500 text-sm mb-4">Retrieve your current wallet balance.</p>
-                        <CodeBlock label="Response Example" code={`{\n  "success": true,\n  "balance": 450.00,\n  "currency": "GHS",\n  "role": "Agent"\n}`} />
+                        <div className="flex items-center gap-3 mb-4"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold text-xs">GET</span><h3 className="text-lg font-bold text-slate-800">/balance</h3></div>
+                        <CodeBlock label="Response" code={`{ "success": true, "balance": 450.00, "currency": "GHS" }`} />
                     </div>
-
                     <hr className="border-slate-100" />
-
-                    {/* PURCHASE ENDPOINT */}
                     <div>
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold text-xs">POST</span>
-                            <h3 className="text-lg font-bold text-slate-800">/purchase</h3>
-                        </div>
-                        <p className="text-slate-500 text-sm mb-4">Purchase a data bundle for a specific number.</p>
-                        
+                        <div className="flex items-center gap-3 mb-4"><span className="bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold text-xs">POST</span><h3 className="text-lg font-bold text-slate-800">/purchase</h3></div>
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
-                                <h4 className="font-bold text-sm text-slate-700 mb-2">Body Parameters</h4>
-                                <table className="w-full text-sm text-left border-collapse">
-                                    <thead><tr className="border-b"><th className="py-2">Field</th><th className="py-2">Type</th><th className="py-2">Description</th></tr></thead>
-                                    <tbody className="text-slate-600">
-                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">network</td><td>String</td><td>See Network Codes below</td></tr>
-                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">planId</td><td>String</td><td>e.g. "1GB", "2GB"</td></tr>
-                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">phone</td><td>String</td><td>Recipient number (054...)</td></tr>
-                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">reference</td><td>String</td><td>Unique ID for tracking</td></tr>
-                                    </tbody>
-                                </table>
+                                <h4 className="font-bold text-sm text-slate-700 mb-2">Parameters</h4>
+                                <ul className="text-sm text-slate-600 space-y-1 list-disc pl-4">
+                                    <li><code className="text-indigo-600">network</code>: "MTN", "AirtelTigo", "Telecel"</li>
+                                    <li><code className="text-indigo-600">planId</code>: "1GB", "2GB", etc.</li>
+                                    <li><code className="text-indigo-600">phone</code>: 10 digits (054xxxxxxx)</li>
+                                    <li><code className="text-indigo-600">reference</code>: Unique ID</li>
+                                </ul>
                             </div>
-                            
                             <div>
-                                <h4 className="font-bold text-sm text-slate-700 mb-2">Accepted Network Codes</h4>
-                                <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
-                                  <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-100 text-slate-500 font-bold uppercase text-xs">
-                                      <tr><th className="px-4 py-2">Network Name</th><th className="px-4 py-2">Code to Send</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-200">
-                                      <tr><td className="px-4 py-2">MTN</td><td className="px-4 py-2 font-mono text-indigo-600">"MTN"</td></tr>
-                                      <tr><td className="px-4 py-2">AirtelTigo</td><td className="px-4 py-2 font-mono text-indigo-600">"AirtelTigo"</td></tr>
-                                      <tr><td className="px-4 py-2">Telecel</td><td className="px-4 py-2 font-mono text-indigo-600">"Telecel"</td></tr>
-                                    </tbody>
-                                  </table>
+                                <h4 className="font-bold text-sm text-slate-700 mb-2">Code Snippets</h4>
+                                <div className="space-y-2">
+                                    <CodeBlock language="PHP" code={phpCode} />
+                                    <CodeBlock language="Node.js" code={nodeCode} />
+                                    <CodeBlock language="Python" code={pythonCode} />
                                 </div>
-                                <div className="mt-4 text-xs text-slate-500">
-                                    <p className="mb-2"><strong>Phone Numbers:</strong> Must be 10 digits starting with '0' (e.g. 0541234567)</p>
-                                    <p><strong>Plan IDs:</strong> Format as capacity + GB (e.g., "1GB", "2GB", "10GB")</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-6">
-                            <h4 className="font-bold text-sm text-slate-700 mb-2">Code Examples</h4>
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <CodeBlock language="PHP (cURL)" label="PHP Integration" code={phpCode} />
-                                <CodeBlock language="Node.js" label="Node.js Integration" code={nodeCode} />
-                                <CodeBlock language="Python" label="Python Integration" code={pythonCode} />
-                                <CodeBlock language="Bash" label="cURL Command" code={curlCode} />
                             </div>
                         </div>
                     </div>
@@ -396,16 +361,12 @@ curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
                     <h3 className="text-xl font-bold text-slate-800">Status Codes</h3>
                     <div className="overflow-hidden border border-slate-200 rounded-xl">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
-                                <tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Meaning</th></tr>
-                            </thead>
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Meaning</th></tr></thead>
                             <tbody className="divide-y divide-slate-100">
-                                <tr><td className="px-4 py-3 font-mono font-bold text-green-600">200</td><td className="px-4 py-3">Request Successful. Order placed.</td></tr>
-                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">400</td><td className="px-4 py-3">Bad Request. Missing fields or Invalid Phone (must start with 0).</td></tr>
-                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">401</td><td className="px-4 py-3">Unauthorized. Invalid or missing API Key.</td></tr>
-                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">402</td><td className="px-4 py-3">Insufficient Balance. Fund your wallet.</td></tr>
-                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">409</td><td className="px-4 py-3">Duplicate Reference. You already used this ID.</td></tr>
-                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">500</td><td className="px-4 py-3">Server Error. Please contact support.</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-green-600">200</td><td className="px-4 py-3">Success</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">400</td><td className="px-4 py-3">Bad Request (Invalid Phone/Plan)</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">401</td><td className="px-4 py-3">Unauthorized (Bad Key)</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">402</td><td className="px-4 py-3">Low Balance</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -426,35 +387,18 @@ const Purchase = ({ refreshUser }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiCall('/data-plans')
-      .then(data => { if(data && data.plans) setPlans(data.plans); })
-      .catch(err => console.log("Plan fetch error:", err));
+    apiCall('/data-plans').then(data => { if(data && data.plans) setPlans(data.plans); });
   }, []);
 
   const handleBuy = async (e) => {
     e.preventDefault();
     if (!planId || phone.length < 10) return;
-    setLoading(true);
-    setError('');
-    
+    setLoading(true); setError('');
     try {
-      const res = await apiCall('/purchase', {
-        method: 'POST', 
-        body: JSON.stringify({ network, planId, phone })
-      });
-      
-      if (res && res.status === 'success') {
-        alert("Order Successful! Processing..."); 
-        setPhone(''); 
-        refreshUser(); 
-      } else {
-        throw new Error(res?.message || "Transaction Failed");
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      const res = await apiCall('/purchase', { method: 'POST', body: JSON.stringify({ network, planId, phone }) });
+      if (res && res.status === 'success') { alert("Order Successful! Processing..."); setPhone(''); refreshUser(); } 
+      else { throw new Error(res?.message || "Transaction Failed"); }
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
   const currentPlans = plans[network] || [];
@@ -525,36 +469,58 @@ const AdminDashboard = () => {
             <button onClick={() => setActiveTab('orders')} className={`px-4 py-2 text-sm font-bold rounded-md transition ${activeTab === 'orders' ? 'bg-slate-100 text-slate-900' : 'text-slate-500'}`}>Manage Orders</button>
         </div>
       </div>
+      
       {activeTab === 'overview' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><TrendingUp size={16} /> Sales Revenue</div><div className="text-3xl font-bold text-[#009879]">GHS {(metrics?.revenue || 0).toFixed(2)}</div></div>
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Landmark size={16} /> Total Deposits</div><div className="text-3xl font-bold text-blue-600">GHS {(metrics?.totalDeposits || 0).toFixed(2)}</div></div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Users size={16} /> Total Users</div><div className="text-3xl font-bold text-slate-800">{metrics?.userCount || 0}</div></div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Activity size={16} /> Orders</div><div className="text-3xl font-bold text-slate-800">{metrics?.totalOrders || 0}</div></div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <>
+        {/* MOBILE CARD VIEW FOR ADMIN */}
+        <div className="space-y-3 md:hidden">
+            {allOrders.map(order => (
+                <div key={order._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="font-bold text-slate-800 text-sm">{order.userId?.username || 'Unknown'}</p>
+                            <p className="text-xs text-slate-400">{new Date(order.createdAt).toLocaleString()}</p>
+                        </div>
+                        <StatusBadge status={order.status} />
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span>{order.dataPlan} ({order.network})</span>
+                        <span className="font-bold">GHS {order.amount.toFixed(2)}</span>
+                    </div>
+                    {/* Admin Actions on Mobile */}
+                    <div className="flex gap-2 border-t pt-2">
+                        <Button size="sm" variant="success" fullWidth onClick={() => handleStatusUpdate(order._id, 'data_sent')}>Send</Button>
+                        <Button size="sm" variant="danger" fullWidth onClick={() => handleStatusUpdate(order._id, 'data_failed')}>Fail</Button>
+                    </div>
+                </div>
+            ))}
+        </div>
+
+        {/* DESKTOP TABLE VIEW */}
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-slate-700">Recent Orders (Last 50)</h3><button onClick={fetchData} className="p-2 text-slate-500 hover:bg-white rounded-full"><RefreshCw size={16} /></button></div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b"><tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">User</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Action</th></tr></thead>
+                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                        <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">User</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Action</th></tr>
+                    </thead>
                     <tbody>
                         {allOrders.map(order => (
                             <tr key={order._id} className="border-b hover:bg-slate-50">
                                 <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
                                 <td className="px-4 py-3 font-medium">{order.userId?.username || 'Unknown'}</td>
-                                <td className="px-4 py-3">
-                                    {order.dataPlan} ({order.network})
-                                    <SourceBadge method={order.paymentMethod} />
-                                </td>
+                                <td className="px-4 py-3">{order.dataPlan} ({order.network}) <SourceBadge method={order.paymentMethod} /></td>
                                 <td className="px-4 py-3">{order.phoneNumber}</td>
-                                <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${order.status === 'data_sent' ? 'bg-green-100 text-green-700' : order.status === 'topup_successful' ? 'bg-blue-100 text-blue-700' : order.status === 'failed' || order.status === 'data_failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                    {order.status === 'data_sent' ? 'Completed' : (order.status === 'pending_review' ? 'Processing' : order.status)}
-                                </span></td>
+                                <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
                                 <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                  {/* ✅ UNLOCKED BUTTONS: Always Visible */}
-                                  <Button size="sm" variant="success" onClick={() => handleStatusUpdate(order._id, 'data_sent')}><Check size={14} /> Send</Button>
-                                  <Button size="sm" variant="danger" onClick={() => handleStatusUpdate(order._id, 'data_failed')}><X size={14} /> Fail</Button>
+                                    <Button size="sm" variant="success" onClick={() => handleStatusUpdate(order._id, 'data_sent')}><Check size={14} /></Button>
+                                    <Button size="sm" variant="danger" onClick={() => handleStatusUpdate(order._id, 'data_failed')}><X size={14} /></Button>
                                 </td>
                             </tr>
                         ))}
@@ -562,11 +528,13 @@ const AdminDashboard = () => {
                 </table>
             </div>
         </div>
+        </>
       )}
     </div>
   );
 };
 
+// ... (Auth component remains same as previous, just ensure it is included)
 const Auth = ({ onLogin, mode, setMode }) => {
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -684,7 +652,45 @@ export default function App() {
               {view === 'console' && <DeveloperConsole user={user} />}
               {view === 'admin' && user.role === 'Admin' && <AdminDashboard />}
               {view === 'purchase' && <Purchase refreshUser={fetchData} />}
-              {view === 'history' && <div className="bg-white rounded-2xl p-6 shadow-sm animate-fade-in"><h2 className="font-bold mb-4">History</h2>{transactions.map(t => <div key={t._id} className="p-3 border-b flex justify-between last:border-0"><span>{t.dataPlan} <SourceBadge method={t.paymentMethod} /></span><b>GHS {t.amount}</b></div>)}</div>}
+              {view === 'history' && (
+                <div className="bg-white md:rounded-2xl md:p-6 md:shadow-sm">
+                    <h2 className="font-bold mb-4 hidden md:block">History</h2>
+                    {/* MOBILE HISTORY (Cards) */}
+                    <div className="space-y-3 md:hidden">
+                        {transactions.map(tx => (
+                            <div key={tx._id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                                <div className="flex justify-between mb-2">
+                                    <span className="font-bold text-slate-700">{tx.dataPlan || 'Txn'}</span>
+                                    <StatusBadge status={tx.status} />
+                                </div>
+                                <div className="flex justify-between items-center text-sm text-slate-500">
+                                    <span>{new Date(tx.createdAt).toLocaleDateString()}</span>
+                                    <div className="flex items-center">
+                                        <span className="font-bold text-slate-800 text-lg mr-2">GHS {tx.amount?.toFixed(2)}</span>
+                                        <SourceBadge method={tx.paymentMethod} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {/* DESKTOP HISTORY (List) */}
+                    <div className="hidden md:block">
+                        {transactions.map(t => (
+                            <div key={t._id} className="p-3 border-b flex justify-between last:border-0 hover:bg-slate-50 transition">
+                                <div>
+                                    <span className="font-medium">{t.dataPlan}</span>
+                                    <SourceBadge method={t.paymentMethod} />
+                                    <p className="text-xs text-slate-400">{new Date(t.createdAt).toLocaleString()}</p>
+                                </div>
+                                <div className="text-right">
+                                    <b className="block">GHS {t.amount?.toFixed(2)}</b>
+                                    <StatusBadge status={t.status} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+              )}
             </div>
           </div>
         </main>
