@@ -9,12 +9,13 @@ import {
 
 // --- Global Styles ---
 const globalStyles = `
-  html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; background-color: #f8fafc; overflow-x: hidden; }
+  html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Inter', sans-serif; overflow-x: hidden; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
   .hover-scale { transition: transform 0.2s ease; }
-  .hover-scale:hover { transform: scale(1.02); }
+  .hover-scale:hover { transform: scale(1.01); }
   .btn-press:active { transform: scale(0.95); }
+  input, select { font-size: 16px !important; } /* Prevents zoom on iOS */
   
   /* Custom Scrollbar for Code Blocks */
   .code-scroll::-webkit-scrollbar { height: 8px; }
@@ -26,7 +27,7 @@ const globalStyles = `
 const API_BASE_URL = 'https://j3cube-data.onrender.com/api'; 
 const PAYSTACK_KEY = "pk_live_62dc43eeea153c81c216b75e3967f8a44ee94fc3"; 
 const FAVICON_URL = 'apple-touch-icon.png';
-const NETWORK_LOGOS = { 'MTN': 'mtn_logo.png', 'AirtelTigo': 'at_logo.png', 'Telecel': 'telecel_logo.png' };
+const NETWORK_LOGOS = { 'MTN': 'mtn_logo.png', 'AirtelTigo': 'at_logo.jpg', 'Telecel': 'telecel_logo.png' };
 
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -46,39 +47,66 @@ const apiCall = async (endpoint, options = {}) => {
   } catch (error) { console.error(`API Error:`, error.message); throw error; }
 };
 
-// --- HELPER: Source Badge ---
+// --- HELPERS ---
 const SourceBadge = ({ method }) => {
     const isApi = method === 'api_wallet';
-    return (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ml-2 ${isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
-            {isApi ? 'API' : 'WEB'}
-        </span>
-    );
+    return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{isApi ? 'API' : 'WEB'}</span>;
 };
 
-// --- HELPER: Status Badge ---
 const StatusBadge = ({ status }) => {
-    let colorClass = 'bg-gray-100 text-gray-600';
-    let label = status;
+    let colorClass = 'bg-gray-100 text-gray-600'; let label = status;
+    if (status === 'data_sent' || status === 'success') { colorClass = 'bg-green-100 text-green-700'; label = 'Completed'; }
+    else if (status === 'pending_review' || status === 'processing') { colorClass = 'bg-yellow-100 text-yellow-700'; label = 'Processing'; }
+    else if (status === 'data_failed' || status === 'failed') { colorClass = 'bg-red-100 text-red-700'; label = 'Failed'; }
+    else if (status === 'topup_successful') { colorClass = 'bg-blue-100 text-blue-700'; label = 'Deposit'; }
+    return <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${colorClass}`}>{label}</span>;
+};
 
-    if (status === 'data_sent' || status === 'success') {
-        colorClass = 'bg-green-100 text-green-700';
-        label = 'Completed';
-    } else if (status === 'pending_review' || status === 'processing') {
-        colorClass = 'bg-yellow-100 text-yellow-700';
-        label = 'Processing';
-    } else if (status === 'data_failed' || status === 'failed') {
-        colorClass = 'bg-red-100 text-red-700';
-        label = 'Failed';
-    } else if (status === 'topup_successful') {
-        colorClass = 'bg-blue-100 text-blue-700';
-        label = 'Deposit';
+// ✅ NEW: Clean Mobile Transaction Card (CK Style)
+const TransactionCard = ({ tx }) => {
+    const isDeposit = tx.status === 'topup_successful';
+    const isSuccess = tx.status === 'data_sent' || tx.status === 'success' || isDeposit;
+    const isPending = tx.status === 'pending_review' || tx.status === 'processing';
+    
+    let statusColor = isSuccess ? 'text-green-600' : (isPending ? 'text-yellow-600' : 'text-red-600');
+    let iconBg = isSuccess ? 'bg-green-50 text-green-600' : (isPending ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600');
+    let Icon = isSuccess ? ArrowDownLeft : ArrowUpRight;
+    let statusLabel = isSuccess ? 'Success' : (isPending ? 'Processing' : 'Failed');
+
+    if (isDeposit) {
+        iconBg = 'bg-blue-50 text-blue-600'; Icon = Wallet; statusLabel = 'Funded'; statusColor = 'text-blue-600';
     }
 
+    const dateObj = new Date(tx.createdAt);
+    const dateStr = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const timeStr = dateObj.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
     return (
-        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${colorClass}`}>
-            {label}
-        </span>
+      <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between gap-4 hover-scale shadow-sm">
+        {/* LEFT: Icon and Details */}
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center ${iconBg}`}>
+            <Icon size={24} strokeWidth={2} />
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-800 text-[15px] mb-1">{tx.dataPlan || (isDeposit ? 'Wallet Topup' : 'Transaction')}</h4>
+            <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+              <span>{dateStr}, {timeStr}</span>
+              <SourceBadge method={tx.paymentMethod} />
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: Amount and Status Text */}
+        <div className="text-right shrink-0">
+          <p className={`font-bold text-lg ${isDeposit ? 'text-blue-600' : 'text-slate-800'}`}>
+              {isDeposit ? '+' : '-'}GHS {tx.amount?.toFixed(2)}
+          </p>
+          <p className={`text-[11px] font-bold uppercase tracking-wider ${statusColor}`}>
+              {statusLabel}
+          </p>
+        </div>
+      </div>
     );
 };
 
@@ -105,7 +133,7 @@ const Input = ({ label, type = "text", value, onChange, placeholder, icon: Icon,
         <input 
           type={isPassword ? (show ? "text" : "password") : type} 
           value={value} onChange={onChange} placeholder={placeholder}
-          className={`w-full ${Icon ? 'pl-10' : 'pl-4'} pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#009879] outline-none transition font-medium text-slate-800`}
+          className={`w-full ${Icon ? 'pl-10' : 'pl-4'} pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#009879] outline-none transition font-medium text-slate-800 font-medium`}
         />
         {isPassword && <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600">{show ? <EyeOff size={18} /> : <Eye size={18} />}</button>}
       </div>
@@ -161,31 +189,14 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
     <div>
       <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-slate-800">Recent Transactions</h3></div>
       
-      {/* 1. MOBILE VIEW: CARDS (Visible on small screens) */}
+      {/* ✅ NEW MOBILE CARDS */}
       <div className="space-y-3 md:hidden">
         {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
-            <div key={tx._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3">
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.status === 'data_sent' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                            {tx.status === 'data_sent' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
-                        </div>
-                        <div>
-                            <p className="font-bold text-slate-800 text-sm">{tx.dataPlan || 'Transaction'}</p>
-                            <p className="text-xs text-slate-400">{new Date(tx.createdAt).toLocaleString()}</p>
-                        </div>
-                    </div>
-                    <StatusBadge status={tx.status} />
-                </div>
-                <div className="flex justify-between items-center border-t border-slate-50 pt-3">
-                    <SourceBadge method={tx.paymentMethod} />
-                    <p className="font-bold text-lg text-slate-800">GHS {tx.amount?.toFixed(2)}</p>
-                </div>
-            </div>
+            <TransactionCard key={tx._id} tx={tx} />
         )) : <div className="p-8 text-center text-slate-400 text-sm bg-white rounded-xl">No recent transactions</div>}
       </div>
 
-      {/* 2. DESKTOP VIEW: LIST (Visible on md+ screens) */}
+      {/* DESKTOP LIST */}
       <div className="hidden md:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
           <div key={tx._id} className="p-4 border-b border-slate-50 flex items-center justify-between last:border-0 hover:bg-slate-50 transition">
@@ -473,12 +484,13 @@ const AdminDashboard = () => {
       {activeTab === 'overview' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><TrendingUp size={16} /> Sales Revenue</div><div className="text-3xl font-bold text-[#009879]">GHS {(metrics?.revenue || 0).toFixed(2)}</div></div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Landmark size={16} /> Total Deposits</div><div className="text-3xl font-bold text-blue-600">GHS {(metrics?.totalDeposits || 0).toFixed(2)}</div></div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Users size={16} /> Total Users</div><div className="text-3xl font-bold text-slate-800">{metrics?.userCount || 0}</div></div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><div className="flex items-center gap-3 mb-2 text-slate-500 text-sm font-bold uppercase"><Activity size={16} /> Orders</div><div className="text-3xl font-bold text-slate-800">{metrics?.totalOrders || 0}</div></div>
         </div>
       ) : (
         <>
-        {/* MOBILE CARD VIEW FOR ADMIN */}
+        {/* ✅ NEW MOBILE CARD VIEW FOR ADMIN */}
         <div className="space-y-3 md:hidden">
             {allOrders.map(order => (
                 <div key={order._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3">
@@ -490,7 +502,7 @@ const AdminDashboard = () => {
                         <StatusBadge status={order.status} />
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                        <span>{order.dataPlan} ({order.network})</span>
+                        <span>{order.dataPlan} ({order.network}) <SourceBadge method={order.paymentMethod} /></span>
                         <span className="font-bold">GHS {order.amount.toFixed(2)}</span>
                     </div>
                     {/* Admin Actions on Mobile */}
@@ -655,25 +667,13 @@ export default function App() {
               {view === 'history' && (
                 <div className="bg-white md:rounded-2xl md:p-6 md:shadow-sm">
                     <h2 className="font-bold mb-4 hidden md:block">History</h2>
-                    {/* MOBILE HISTORY (Cards) */}
+                    {/* ✅ NEW MOBILE CARDS */}
                     <div className="space-y-3 md:hidden">
                         {transactions.map(tx => (
-                            <div key={tx._id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                                <div className="flex justify-between mb-2">
-                                    <span className="font-bold text-slate-700">{tx.dataPlan || 'Txn'}</span>
-                                    <StatusBadge status={tx.status} />
-                                </div>
-                                <div className="flex justify-between items-center text-sm text-slate-500">
-                                    <span>{new Date(tx.createdAt).toLocaleDateString()}</span>
-                                    <div className="flex items-center">
-                                        <span className="font-bold text-slate-800 text-lg mr-2">GHS {tx.amount?.toFixed(2)}</span>
-                                        <SourceBadge method={tx.paymentMethod} />
-                                    </div>
-                                </div>
-                            </div>
+                            <TransactionCard key={tx._id} tx={tx} />
                         ))}
                     </div>
-                    {/* DESKTOP HISTORY (List) */}
+                    {/* DESKTOP LIST */}
                     <div className="hidden md:block">
                         {transactions.map(t => (
                             <div key={t._id} className="p-3 border-b flex justify-between last:border-0 hover:bg-slate-50 transition">
@@ -699,4 +699,3 @@ export default function App() {
     </>
   );
 }
-
