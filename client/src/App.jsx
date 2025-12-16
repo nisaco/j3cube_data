@@ -26,7 +26,7 @@ const globalStyles = `
 const API_BASE_URL = 'https://j3cube-data.onrender.com/api'; 
 const PAYSTACK_KEY = "pk_live_62dc43eeea153c81c216b75e3967f8a44ee94fc3"; 
 const FAVICON_URL = 'apple-touch-icon.png';
-const NETWORK_LOGOS = { 'MTN': 'mtn_logo.png', 'AirtelTigo': 'at_logo.jpg', 'Telecel': 'telecel_logo.png' };
+const NETWORK_LOGOS = { 'MTN': 'mtn_logo.png', 'AirtelTigo': 'at_logo.png', 'Telecel': 'telecel_logo.png' };
 
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -699,3 +699,4 @@ export default function App() {
     </>
   );
 }
+
