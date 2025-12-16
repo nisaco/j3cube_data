@@ -78,23 +78,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: true, credentials: true }));
 
-// ✅ FIXED SESSION CONFIGURATION
 app.use(session({
     secret: process.env.SESSION_SECRET || 'dev-secret-key-123',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.MONGO_URI, ttl: 24 * 60 * 60 }),
-    cookie: { 
-        secure: process.env.NODE_ENV === 'production', // True on Render (HTTPS)
-        sameSite: 'lax', // ✅ CHANGED from 'none' to 'lax' for better stability
-        httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 // 24 hours
-    } 
+    cookie: { secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', maxAge: 1000 * 60 * 60 * 24 } 
 }));
 
 app.use(express.static(path.join(__dirname, 'client/dist')));
 
 // --- HELPER: PHONE VALIDATION ---
+// ✅ STRICT VALIDATION: Starts with 0, exactly 10 digits
 function isValidGhanaPhone(phone) {
     return /^0\d{9}$/.test(phone);
 }
@@ -113,11 +108,7 @@ app.post('/api/signup', async (req, res) => {
         const newUser = await User.create({ username, email, password: hashedPassword, role: 'Client', lastLogin: new Date() });
 
         req.session.user = { id: newUser._id, username, role: 'Client' };
-        // ✅ Force session save before responding
-        req.session.save(err => {
-            if(err) return res.status(500).json({message: 'Session error'});
-            res.status(201).json({ message: 'Account created!', user: req.session.user });
-        });
+        res.status(201).json({ message: 'Account created!', user: req.session.user });
     } catch (e) { res.status(500).json({ message: `Server Error: ${e.message}` }); }
 });
 
@@ -131,11 +122,7 @@ app.post('/api/login', async (req, res) => {
         await user.save();
         
         req.session.user = { id: user._id, username: user.username, role: user.role };
-        // ✅ Force session save
-        req.session.save(err => {
-            if(err) return res.status(500).json({message: 'Session save error'});
-            res.json({ message: 'Logged in', role: user.role, user: req.session.user });
-        });
+        res.json({ message: 'Logged in', role: user.role, user: req.session.user });
     } catch (e) { res.status(500).json({ message: 'Server error' }); }
 });
 
@@ -162,7 +149,6 @@ app.post('/api/upgrade-agent', async (req, res) => {
         if (data.status === 'success' && data.amount >= (AGENT_FEE_GHS * 100)) {
             await User.findByIdAndUpdate(req.session.user.id, { role: 'Agent' });
             req.session.user.role = 'Agent'; 
-            req.session.save(); // Save role update
             res.json({ success: true, message: 'Upgraded to Agent successfully!' });
         } else { res.status(400).json({ message: 'Payment verification failed.' }); }
     } catch (e) { res.status(500).json({ message: 'Verification error' }); }
@@ -197,13 +183,14 @@ app.post('/api/verify-topup', async (req, res) => {
     } catch (e) { res.status(500).json({ message: 'Server error' }); }
 });
 
-// PURCHASE (BROWSER)
+// PURCHASE (BROWSER) - ✅ UPDATED
 app.post('/api/purchase', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     const { network, planId, phone } = req.body;
     const userId = req.session.user.id;
 
     try {
+        // 🚨 STRICT PHONE CHECK
         if (!isValidGhanaPhone(phone)) {
             return res.status(400).json({ message: 'Invalid phone number. Must start with 0 and be 10 digits.' });
         }
@@ -244,7 +231,7 @@ app.post('/api/purchase', async (req, res) => {
             } else { throw new Error(result.error || "API failure"); }
         } catch (apiError) {
             console.error("API Call Failed:", apiError.message);
-            user.walletBalance += costPesewas; 
+            user.walletBalance += costPesewas; // Auto Refund
             await user.save();
             newOrder.status = 'data_failed'; 
             await newOrder.save();
@@ -284,11 +271,17 @@ const verifyApiKey = async (req, res, next) => {
     } catch (e) { res.status(500).json({ success: false, message: 'Auth Error' }); }
 };
 
+// 2. Generate API Key (Improved for reliability)
 app.post('/api/generate-key', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     try {
         const newKey = `j3_live_${Math.random().toString(36).substr(2, 9)}${Date.now().toString(36)}`;
-        const updatedUser = await User.findByIdAndUpdate(req.session.user.id, { apiKey: newKey }, { new: true });
+        // Uses findByIdAndUpdate to ensure atomic update
+        const updatedUser = await User.findByIdAndUpdate(
+            req.session.user.id, 
+            { apiKey: newKey }, 
+            { new: true } // Return the updated document
+        );
         if (!updatedUser) throw new Error("User update failed");
         res.json({ success: true, apiKey: updatedUser.apiKey });
     } catch (e) { res.status(500).json({ message: e.message }); }
@@ -302,13 +295,17 @@ app.get('/api/get-key', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// EXTERNAL PURCHASE
+// EXTERNAL PURCHASE - ✅ UPDATED
 app.post('/api/v1/purchase', verifyApiKey, async (req, res) => {
     const { network, planId, phone, reference } = req.body;
     const user = req.user; 
     try {
         if (!network || !planId || !phone || !reference) return res.status(400).json({ success: false, message: 'Missing parameters' });
-        if (!isValidGhanaPhone(phone)) return res.status(400).json({ success: false, message: 'Invalid phone number.' });
+        
+        // 🚨 STRICT PHONE CHECK FOR API USERS TOO
+        if (!isValidGhanaPhone(phone)) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number. Must start with 0 and be 10 digits.' });
+        }
 
         const exists = await Order.findOne({ reference });
         if (exists) return res.status(409).json({ success: false, message: 'Duplicate reference' });
