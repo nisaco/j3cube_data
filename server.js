@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 10000;
 // --- CONFIGURATION ---
 const AGENT_FEE_GHS = 15.00;
 const CK_BASE_URL = 'https://console.ckgodsway.com/api'; 
-const NETWORK_MAP = { 'MTN': 'YELLO', 'AirtelTigo': 'AT_PREMIUM', 'Telecel': 'TELECEL' };
+const NETWORK_MAP = { 'MTN': 'MTN_PRO', 'AirtelTigo': 'AT_PREMIUM', 'Telecel': 'TELECEL' };
 
 const PRICING = {
     RETAIL: { 
@@ -401,4 +401,5 @@ app.post('/api/paystack-webhook', async (req, res) => {
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'client/dist', 'index.html')));
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
