@@ -4,7 +4,7 @@ import {
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
   Loader2, User, Eye, EyeOff, ShieldCheck, Box,
   TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw, Landmark,
-  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen, Tag, Calendar, Hash, Signal
+  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen, Tag, Calendar, Hash, Signal, Search
 } from 'lucide-react';
 
 // --- Global Styles ---
@@ -61,11 +61,9 @@ const StatusBadge = ({ status }) => {
     return <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${colorClass}`}>{label}</span>;
 };
 
-// ✅ NEW: DETAILED TICKET-STYLE CARD
+// --- TICKET CARD COMPONENT ---
 const TransactionCard = ({ tx }) => {
     const isDeposit = tx.status === 'topup_successful';
-    
-    // Network Color Coding
     let netColor = 'bg-slate-300';
     if (tx.network === 'MTN') netColor = 'bg-yellow-400';
     if (tx.network === 'Telecel') netColor = 'bg-red-500';
@@ -78,11 +76,8 @@ const TransactionCard = ({ tx }) => {
 
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden hover-scale mb-3">
-        {/* Color Bar */}
         <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${netColor}`}></div>
-        
         <div className="p-4 pl-6">
-            {/* Header: Network/Type & Amount */}
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
@@ -97,8 +92,6 @@ const TransactionCard = ({ tx }) => {
                     </p>
                 </div>
             </div>
-
-            {/* Details Grid */}
             {!isDeposit && (
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm mb-4 border-t border-slate-50 pt-3">
                     <div>
@@ -111,8 +104,6 @@ const TransactionCard = ({ tx }) => {
                     </div>
                 </div>
             )}
-
-            {/* Footer: Status & Source */}
             <div className={`flex justify-between items-center ${isDeposit ? 'mt-1' : 'pt-1'}`}>
                 <StatusBadge status={tx.status} />
                 <SourceBadge method={tx.paymentMethod} />
@@ -122,7 +113,7 @@ const TransactionCard = ({ tx }) => {
     );
 };
 
-// --- COMPONENTS ---
+// --- GENERIC COMPONENTS ---
 const Button = ({ children, onClick, disabled = false, fullWidth = false, variant = 'primary', size = 'default' }) => {
   const base = `rounded-xl font-bold transition-all btn-press flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-3'}`;
   const variants = {
@@ -139,7 +130,7 @@ const Input = ({ label, type = "text", value, onChange, placeholder, icon: Icon,
   const [show, setShow] = useState(false);
   return (
     <div className="mb-4">
-      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{label}</label>
+      {label && <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{label}</label>}
       <div className="relative">
         {Icon && <Icon className="absolute left-3 top-3.5 text-slate-400" size={18} />}
         <input 
@@ -170,7 +161,22 @@ const CodeBlock = ({ label, code, language = "json" }) => {
 
 // --- VIEWS ---
 
-const Dashboard = ({ user, transactions, setView, onTopUp }) => (
+const Dashboard = ({ user, transactions, setView, onTopUp }) => {
+  // ✅ NEW: Search State
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // ✅ NEW: Filter Logic
+  const filteredTransactions = transactions.filter(tx => {
+      const search = searchTerm.toLowerCase();
+      return (
+          (tx.phoneNumber && tx.phoneNumber.includes(search)) ||
+          (tx.network && tx.network.toLowerCase().includes(search)) ||
+          (tx.reference && tx.reference.toLowerCase().includes(search)) ||
+          (tx.dataPlan && tx.dataPlan.toLowerCase().includes(search))
+      );
+  });
+
+  return (
   <div className="space-y-6 animate-fade-in pb-20">
     <div className="bg-gradient-to-br from-[#009879] to-[#006d5b] rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden hover-scale">
       <div className="relative z-10">
@@ -198,19 +204,25 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
       </button>
     </div>
 
+    {/* HISTORY SECTION WITH SEARCH */}
     <div>
-      <div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-slate-800">Recent Transactions</h3></div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+          <h3 className="text-lg font-bold text-slate-800">Recent Transactions</h3>
+          <div className="w-full md:w-64">
+              <Input placeholder="Search phone, net, ref..." icon={Search} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+      </div>
       
-      {/* ✅ NEW MOBILE CARDS */}
+      {/* MOBILE CARDS */}
       <div className="space-y-1 md:hidden">
-        {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
+        {filteredTransactions.length > 0 ? filteredTransactions.slice(0, 5).map((tx) => (
             <TransactionCard key={tx._id} tx={tx} />
-        )) : <div className="p-8 text-center text-slate-400 text-sm bg-white rounded-xl">No recent transactions</div>}
+        )) : <div className="p-8 text-center text-slate-400 text-sm bg-white rounded-xl">No transactions found</div>}
       </div>
 
       {/* DESKTOP LIST */}
       <div className="hidden md:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
+        {filteredTransactions.length > 0 ? filteredTransactions.slice(0, 5).map((tx) => (
           <div key={tx._id} className="p-4 border-b border-slate-50 flex items-center justify-between last:border-0 hover:bg-slate-50 transition">
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.status === 'data_sent' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
@@ -229,13 +241,13 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
                 <div className="flex justify-end mt-1"><StatusBadge status={tx.status} /></div>
             </div>
           </div>
-        )) : <div className="p-8 text-center text-slate-400 text-sm">No recent transactions</div>}
+        )) : <div className="p-8 text-center text-slate-400 text-sm">No transactions found</div>}
       </div>
     </div>
   </div>
-);
+  );
+};
 
-// ... (DeveloperConsole, Purchase, AdminDashboard, Auth - Keep as previously provided, they don't need changes for this request)
 const DeveloperConsole = ({ user }) => {
   const [apiKey, setApiKey] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -463,6 +475,7 @@ const AdminDashboard = () => {
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); 
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -482,6 +495,17 @@ const AdminDashboard = () => {
       if (res && res.success) { alert("Status Updated Successfully!"); fetchData(); } else { alert("Update Failed: " + (res?.error || "Unknown")); }
     } catch(e) { alert("Network Error"); }
   };
+
+  // ✅ FILTERED ORDERS FOR ADMIN
+  const filteredOrders = allOrders.filter(order => {
+      const search = searchTerm.toLowerCase();
+      return (
+          (order.userId?.username?.toLowerCase().includes(search)) ||
+          (order.phoneNumber && order.phoneNumber.includes(search)) ||
+          (order.reference && order.reference.toLowerCase().includes(search))
+      );
+  });
+
   if (loading && !metrics) return <div className="min-h-screen flex items-center justify-center text-[#009879]"><Loader2 className="animate-spin" size={40} /></div>;
 
   return (
@@ -503,9 +527,13 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <>
-        {/* MOBILE CARD VIEW FOR ADMIN */}
+        <div className="mb-4">
+            <Input placeholder="Search user, phone, ref..." icon={Search} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        </div>
+
+        {/* ✅ NEW MOBILE CARD VIEW FOR ADMIN */}
         <div className="space-y-3 md:hidden">
-            {allOrders.map(order => (
+            {filteredOrders.map(order => (
                 <div key={order._id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3">
                     <div className="flex justify-between items-start">
                         <div>
@@ -536,7 +564,7 @@ const AdminDashboard = () => {
                         <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">User</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Action</th></tr>
                     </thead>
                     <tbody>
-                        {allOrders.map(order => (
+                        {filteredOrders.map(order => (
                             <tr key={order._id} className="border-b hover:bg-slate-50">
                                 <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
                                 <td className="px-4 py-3 font-medium">{order.userId?.username || 'Unknown'}</td>
@@ -559,6 +587,7 @@ const AdminDashboard = () => {
   );
 };
 
+// ... (Auth component remains same as previous, just ensure it is included)
 const Auth = ({ onLogin, mode, setMode }) => {
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -678,16 +707,24 @@ export default function App() {
               {view === 'purchase' && <Purchase refreshUser={fetchData} />}
               {view === 'history' && (
                 <div className="bg-white md:rounded-2xl md:p-6 md:shadow-sm">
-                    <h2 className="font-bold mb-4 hidden md:block">History</h2>
+                    {/* Header with Search */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 className="font-bold text-lg md:text-xl hidden md:block">Transaction History</h2>
+                        <div className="w-full md:w-64">
+                            <Input placeholder="Search phone, net, ref..." icon={Search} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        </div>
+                    </div>
+
                     {/* ✅ NEW MOBILE CARDS */}
                     <div className="space-y-1 md:hidden">
-                        {transactions.map(tx => (
+                        {filteredTransactions.length > 0 ? filteredTransactions.map((tx) => (
                             <TransactionCard key={tx._id} tx={tx} />
-                        ))}
+                        )) : <div className="p-8 text-center text-slate-400 text-sm bg-white rounded-xl">No transactions found</div>}
                     </div>
+
                     {/* DESKTOP LIST */}
                     <div className="hidden md:block">
-                        {transactions.map(t => (
+                        {filteredTransactions.length > 0 ? filteredTransactions.map(t => (
                             <div key={t._id} className="p-3 border-b flex justify-between last:border-0 hover:bg-slate-50 transition">
                                 <div>
                                     <span className="font-medium">{t.dataPlan}</span>
@@ -699,7 +736,7 @@ export default function App() {
                                     <StatusBadge status={t.status} />
                                 </div>
                             </div>
-                        ))}
+                        )) : <div className="p-8 text-center text-slate-400 text-sm">No transactions found</div>}
                     </div>
                 </div>
               )}
