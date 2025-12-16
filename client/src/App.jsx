@@ -78,7 +78,7 @@ const timeAgo = (date) => {
     } catch (e) { return 'Unknown'; }
 };
 
-// ✅ HELPER: Safe Date Format (Prevents Blank Page Crash)
+// HELPER: Format Date & Time (Safe)
 const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
     try {
@@ -107,8 +107,9 @@ const generateTheme = (mode, accentColor) => {
 // --- HELPERS FOR CARDS ---
 const SourceBadge = ({ method, theme }) => {
     const isApi = method === 'api_wallet';
-    const bgClass = isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : `${theme.inputBg} ${theme.textSub}`;
-    return <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${theme.border} ${bgClass}`}>{isApi ? 'API' : 'WEB'}</span>;
+    // Handle theme implicitly via classes passed down or safe defaults
+    const bgClass = isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : `${theme?.inputBg || 'bg-slate-100'} ${theme?.textSub || 'text-slate-500'} ${theme?.border || 'border-slate-200'}`;
+    return <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${bgClass}`}>{isApi ? 'API' : 'WEB'}</span>;
 };
 
 const StatusBadge = ({ status }) => {
@@ -120,12 +121,10 @@ const StatusBadge = ({ status }) => {
     return <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${colorClass}`}>{label}</span>;
 };
 
-// ✅ NEW: TICKET STYLE CARD (Integrated with Main App Theme)
+// ✅ TRANSACTION CARD (Safe Date Parsing)
 const TransactionCard = ({ tx }) => {
     const { theme } = useContext(ThemeContext);
     const isDeposit = tx.status === 'topup_successful';
-    
-    // Network Colors
     let netColor = 'bg-slate-300';
     const planUpper = (tx.dataPlan || '').toUpperCase();
     const netUpper = (tx.network || '').toUpperCase();
@@ -134,7 +133,6 @@ const TransactionCard = ({ tx }) => {
     if (netUpper.includes('AIRTEL') || planUpper.includes('AIRTEL')) netColor = 'bg-blue-600';
     if (isDeposit) netColor = 'bg-emerald-500';
 
-    // Safe Date Parsing
     let dateStr = 'N/A', timeStr = '';
     try {
         const dateObj = new Date(tx.createdAt);
@@ -144,11 +142,8 @@ const TransactionCard = ({ tx }) => {
 
     return (
       <div className={`${theme.cardBg} rounded-2xl shadow-sm border ${theme.border} relative overflow-hidden hover:scale-[1.01] transition-transform mb-3`}>
-        {/* Color Bar */}
         <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${netColor}`}></div>
-        
         <div className="p-4 pl-6">
-            {/* Header */}
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h4 className={`font-bold ${theme.textMain} text-lg flex items-center gap-2`}>
@@ -163,8 +158,6 @@ const TransactionCard = ({ tx }) => {
                     </p>
                 </div>
             </div>
-
-            {/* Details Grid */}
             {!isDeposit && (
                 <div className={`grid grid-cols-2 gap-y-3 gap-x-4 text-sm mb-4 border-t ${theme.border} pt-3`}>
                     <div>
@@ -177,8 +170,6 @@ const TransactionCard = ({ tx }) => {
                     </div>
                 </div>
             )}
-
-            {/* Footer */}
             <div className={`flex justify-between items-center ${isDeposit ? 'mt-1' : 'pt-1'}`}>
                 <StatusBadge status={tx.status} />
                 <SourceBadge method={tx.paymentMethod} theme={theme} />
@@ -202,7 +193,7 @@ const Input = ({ label, type = "text", value, onChange, placeholder, icon: Icon,
   const [show, setShow] = useState(false);
   return (
     <div className="mb-4">
-      <label className={`block text-xs font-bold ${theme.textSub} uppercase mb-2`}>{label}</label>
+      {label && <label className={`block text-xs font-bold ${theme.textSub} uppercase mb-2`}>{label}</label>}
       <div className="relative">
         {Icon && <Icon className={`absolute left-3 top-3.5 ${theme.textSub}`} size={18} />}
         {isTextArea ? (
@@ -576,7 +567,6 @@ const AgentShopManager = ({ user, refreshUser }) => {
 };
 
 // --- UPDATED ADMIN DASHBOARD ---
-// Includes Time Formatting and Recipient Phone Number
 const AdminDashboard = () => {
   const { theme } = useContext(ThemeContext);
   const [metrics, setMetrics] = useState(null); 
@@ -587,7 +577,6 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview'); 
   const [searchTerm, setSearchTerm] = useState(''); 
 
-  // ✅ Auto Refresh Function
   const fetchData = async () => { try { const mRes = await apiCall('/admin/metrics'); if (mRes) setMetrics(mRes); const oRes = await apiCall('/admin/all-orders'); if (oRes) setAllOrders(oRes.orders); const wRes = await apiCall('/admin/withdrawals'); if (wRes) setWithdrawals(wRes.withdrawals); const uRes = await apiCall('/admin/users'); if (uRes) setUsers(uRes.users); } catch (err) { console.error(err); } finally { setLoading(false); } };
   useEffect(() => { 
       fetchData();
@@ -672,6 +661,7 @@ const AdminDashboard = () => {
   );
 };
 
+// ... (Auth component remains same as previous, just ensure it is included)
 const Auth = ({ onLogin, mode, setMode }) => {
   const { theme } = useContext(ThemeContext); const [formData, setFormData] = useState({ username: '', email: '', password: '' }); const [loading, setLoading] = useState(false); const [isAdminMode, setIsAdminMode] = useState(false); const [stealthClicks, setStealthClicks] = useState(0); const [roleSelection, setRoleSelection] = useState('Client'); const [termsAccepted, setTermsAccepted] = useState(false); const [error, setError] = useState('');
   const handleSubmit = async (e) => { e.preventDefault(); setLoading(true); setError(''); if (mode === 'signup' && !termsAccepted) { setError("You must agree to the Terms and Conditions."); setLoading(false); return; } const cleanData = { username: formData.username.trim(), email: formData.email.trim(), password: formData.password }; if (mode === 'signup' && roleSelection === 'Agent') { handleAgentUpgrade(cleanData); return; } try { const endpoint = mode === 'login' ? '/login' : '/signup'; const res = await apiCall(endpoint, { method: 'POST', body: JSON.stringify(cleanData) }); if (res) { if (isAdminMode && res.role !== 'Admin') { await apiCall('/logout'); alert("Access Denied"); } else { onLogin(); } } } catch (err) { setError(err.message || "Authentication failed"); } finally { setLoading(false); } };
