@@ -152,14 +152,14 @@ const DeveloperConsole = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // overview, endpoints, errors
 
-  useEffect(() => { apiCall('/get-key').then(res => { if(res.apiKey) setApiKey(res.apiKey); }); }, []);
+  useEffect(() => { apiCall('/get-key').then(res => { if(res && res.apiKey) setApiKey(res.apiKey); }); }, []);
 
   const generateKey = async () => {
     if(!window.confirm("Generating a new key will stop your old one. Continue?")) return;
     setLoading(true);
     try {
       const res = await apiCall('/generate-key', { method: 'POST' });
-      if(res.success) setApiKey(res.apiKey);
+      if(res && res.success) setApiKey(res.apiKey);
     } catch(e) { alert(e.message); } finally { setLoading(false); }
   };
 
@@ -324,6 +324,7 @@ axios(config)
                                   </table>
                                 </div>
                                 <div className="mt-4 text-xs text-slate-500">
+                                    <p className="mb-2"><strong>Phone Numbers:</strong> Must be 10 digits starting with '0' (e.g. 0541234567)</p>
                                     <p><strong>Plan IDs:</strong> Format as capacity + GB (e.g., "1GB", "2GB", "10GB")</p>
                                 </div>
                             </div>
@@ -350,7 +351,7 @@ axios(config)
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 <tr><td className="px-4 py-3 font-mono font-bold text-green-600">200</td><td className="px-4 py-3">Request Successful. Order placed.</td></tr>
-                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">400</td><td className="px-4 py-3">Bad Request. Missing fields (e.g. no phone number).</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">400</td><td className="px-4 py-3">Bad Request. Missing fields or Invalid Phone (must start with 0).</td></tr>
                                 <tr><td className="px-4 py-3 font-mono font-bold text-red-500">401</td><td className="px-4 py-3">Unauthorized. Invalid or missing API Key.</td></tr>
                                 <tr><td className="px-4 py-3 font-mono font-bold text-red-500">402</td><td className="px-4 py-3">Insufficient Balance. Fund your wallet.</td></tr>
                                 <tr><td className="px-4 py-3 font-mono font-bold text-red-500">409</td><td className="px-4 py-3">Duplicate Reference. You already used this ID.</td></tr>
