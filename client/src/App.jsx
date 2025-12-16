@@ -4,7 +4,7 @@ import {
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
   Loader2, User, Eye, EyeOff, ShieldCheck, Box,
   TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw, Landmark,
-  Code, Terminal, Copy, Globe 
+  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen
 } from 'lucide-react';
 
 // --- Global Styles ---
@@ -15,6 +15,11 @@ const globalStyles = `
   .hover-scale { transition: transform 0.2s ease; }
   .hover-scale:hover { transform: scale(1.02); }
   .btn-press:active { transform: scale(0.95); }
+  
+  /* Custom Scrollbar for Code Blocks */
+  .code-scroll::-webkit-scrollbar { height: 8px; }
+  .code-scroll::-webkit-scrollbar-track { background: #1e293b; }
+  .code-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
 `;
 
 // --- CONFIGURATION ---
@@ -72,6 +77,21 @@ const Input = ({ label, type = "text", value, onChange, placeholder, icon: Icon,
   );
 };
 
+const CodeBlock = ({ label, code, language = "json" }) => {
+    const copy = () => { navigator.clipboard.writeText(code); alert("Copied!"); };
+    return (
+        <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-700 my-4 shadow-lg">
+            <div className="flex justify-between items-center px-4 py-2 bg-slate-800 border-b border-slate-700">
+                <span className="text-xs font-bold text-slate-400 uppercase">{label || language}</span>
+                <button onClick={copy} className="text-slate-400 hover:text-white transition"><Copy size={14}/></button>
+            </div>
+            <div className="p-4 overflow-x-auto code-scroll">
+                <pre className="text-xs md:text-sm font-mono text-emerald-400 whitespace-pre">{code}</pre>
+            </div>
+        </div>
+    );
+};
+
 // --- VIEWS ---
 
 const Dashboard = ({ user, transactions, setView, onTopUp }) => (
@@ -113,7 +133,6 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
               </div>
               <div><p className="font-bold text-slate-700 text-sm">{tx.dataPlan || 'Transaction'}</p><p className="text-xs text-slate-400">{new Date(tx.createdAt).toLocaleDateString()}</p></div>
             </div>
-            {/* ✅ STATUS DISPLAY MAPPING: pending_review -> Processing */}
             <div className="text-right">
                 <p className="font-bold text-sm text-slate-800">GHS {tx.amount?.toFixed(2)}</p>
                 <p className={`text-[10px] uppercase font-bold ${tx.status === 'data_sent' ? 'text-green-600' : 'text-yellow-600'}`}>
@@ -127,9 +146,11 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
   </div>
 );
 
+// ✅ NEW: PROFESSIONAL DEVELOPER CONSOLE
 const DeveloperConsole = ({ user }) => {
   const [apiKey, setApiKey] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // overview, endpoints, errors
 
   useEffect(() => { apiCall('/get-key').then(res => { if(res.apiKey) setApiKey(res.apiKey); }); }, []);
 
@@ -144,45 +165,188 @@ const DeveloperConsole = ({ user }) => {
 
   const copyToClipboard = () => { navigator.clipboard.writeText(apiKey); alert("API Key Copied!"); };
 
+  const phpCode = `
+$curl = curl_init();
+curl_setopt_array($curl, array(
+  CURLOPT_URL => 'https://j3cube-data.onrender.com/api/v1/purchase',
+  CURLOPT_RETURNTRANSFER => true,
+  CURLOPT_ENCODING => '',
+  CURLOPT_MAXREDIRS => 10,
+  CURLOPT_TIMEOUT => 0,
+  CURLOPT_FOLLOWLOCATION => true,
+  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+  CURLOPT_CUSTOMREQUEST => 'POST',
+  CURLOPT_POSTFIELDS =>'{
+    "network": "MTN",
+    "planId": "1GB",
+    "phone": "054xxxxxxx",
+    "reference": "REF-${Math.floor(Math.random()*10000)}"
+  }',
+  CURLOPT_HTTPHEADER => array(
+    'Content-Type: application/json',
+    'x-api-key: YOUR_API_KEY'
+  ),
+));
+$response = curl_exec($curl);
+curl_close($curl);
+echo $response;`;
+
+  const nodeCode = `
+const axios = require('axios');
+const data = JSON.stringify({
+  "network": "MTN",
+  "planId": "1GB",
+  "phone": "054xxxxxxx",
+  "reference": "unique_ref_123"
+});
+
+const config = {
+  method: 'post',
+  url: 'https://j3cube-data.onrender.com/api/v1/purchase',
+  headers: { 
+    'Content-Type': 'application/json', 
+    'x-api-key': 'YOUR_API_KEY'
+  },
+  data : data
+};
+
+axios(config)
+.then(function (response) {
+  console.log(JSON.stringify(response.data));
+})
+.catch(function (error) {
+  console.log(error);
+});`;
+
   return (
     <div className="space-y-6 animate-fade-in pb-20">
+      {/* HEADER CARD */}
       <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
         <div className="relative z-10">
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3"><Terminal className="text-green-400" /> Developer Console</h1>
-            <p className="text-slate-400 mb-6">Integrate J3Cube directly into your own applications.</p>
-            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
-                <div className="overflow-hidden">
+            <p className="text-slate-400 mb-6">Build your own data business using our robust API.</p>
+            
+            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="overflow-hidden w-full">
                     <p className="text-xs text-slate-500 font-bold uppercase mb-1">Your Live API Key</p>
-                    <code className="text-green-400 font-mono text-lg block truncate">{apiKey || "No API Key Generated"}</code>
+                    <code className="text-green-400 font-mono text-lg block truncate bg-slate-900/50 p-2 rounded border border-slate-700">
+                        {apiKey || "No API Key Generated"}
+                    </code>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                    {apiKey && <button onClick={copyToClipboard} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition text-slate-300"><Copy size={20} /></button>}
-                    <button onClick={generateKey} disabled={loading} className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-bold text-sm px-4">{loading ? '...' : (apiKey ? 'Regenerate' : 'Generate Key')}</button>
+                <div className="flex gap-2 shrink-0 w-full md:w-auto">
+                    {apiKey && <button onClick={copyToClipboard} className="flex-1 md:flex-none p-3 bg-slate-700 hover:bg-slate-600 rounded-lg transition text-slate-300 flex justify-center"><Copy size={20} /></button>}
+                    <button onClick={generateKey} disabled={loading} className="flex-1 md:flex-none p-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-bold text-sm px-6">
+                        {loading ? 'Generating...' : (apiKey ? 'Regenerate Key' : 'Generate Key')}
+                    </button>
                 </div>
             </div>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover-scale">
-        <h3 className="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><Globe size={20} className="text-indigo-600"/> API Documentation</h3>
-        <div className="space-y-4">
-            <div>
-                <p className="text-sm font-bold text-slate-500 mb-2">1. Base URL</p>
-                <div className="bg-slate-100 p-3 rounded-lg font-mono text-sm text-slate-600">https://j3cube-data.onrender.com/api/v1</div>
-            </div>
-            <div>
-                <p className="text-sm font-bold text-slate-500 mb-2">2. Buy Data Endpoint</p>
-                <div className="bg-slate-900 text-slate-300 p-4 rounded-xl font-mono text-xs overflow-x-auto">
-<pre>{`// POST /purchase
-Headers: { "x-api-key": "YOUR_KEY", "Content-Type": "application/json" }
-Body: {
-  "network": "MTN",        // MTN, AirtelTigo, Telecel
-  "planId": "1GB",         // 1GB, 2GB, 5GB...
-  "phone": "054xxxxxxx",
-  "reference": "UNIQUE_ID" // You must generate this
-}`}</pre>
+      {/* DOCUMENTATION TABS */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="flex border-b border-slate-100">
+            <button onClick={()=>setActiveTab('overview')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'overview' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Overview & Auth</button>
+            <button onClick={()=>setActiveTab('endpoints')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'endpoints' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Endpoints</button>
+            <button onClick={()=>setActiveTab('errors')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'errors' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Errors & Codes</button>
+        </div>
+
+        <div className="p-6 md:p-8">
+            {activeTab === 'overview' && (
+                <div className="space-y-8 animate-fade-in">
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">Authentication</h3>
+                        <p className="text-slate-500 text-sm leading-relaxed mb-4">
+                            All API requests must be authenticated using your unique API Key. 
+                            Pass this key in the request header <code className="bg-slate-100 px-2 py-1 rounded text-slate-700 font-mono">x-api-key</code>.
+                        </p>
+                        <CodeBlock label="Header Example" code={`Authorization: Bearer YOUR_API_KEY\n-- OR --\nx-api-key: YOUR_API_KEY`} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2">Base URL</h3>
+                        <p className="text-slate-500 text-sm mb-2">All requests should be made to:</p>
+                        <div className="bg-slate-100 p-4 rounded-xl border border-slate-200 font-mono text-sm text-slate-600">
+                            https://j3cube-data.onrender.com/api/v1
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {activeTab === 'endpoints' && (
+                <div className="space-y-10 animate-fade-in">
+                    {/* BALANCE ENDPOINT */}
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold text-xs">GET</span>
+                            <h3 className="text-lg font-bold text-slate-800">/balance</h3>
+                        </div>
+                        <p className="text-slate-500 text-sm mb-4">Retrieve your current wallet balance.</p>
+                        <CodeBlock label="Response Example" code={`{\n  "success": true,\n  "balance": 450.00,\n  "currency": "GHS",\n  "role": "Agent"\n}`} />
+                    </div>
+
+                    <hr className="border-slate-100" />
+
+                    {/* PURCHASE ENDPOINT */}
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold text-xs">POST</span>
+                            <h3 className="text-lg font-bold text-slate-800">/purchase</h3>
+                        </div>
+                        <p className="text-slate-500 text-sm mb-4">Purchase a data bundle for a specific number.</p>
+                        
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 className="font-bold text-sm text-slate-700 mb-2">Body Parameters</h4>
+                                <table className="w-full text-sm text-left border-collapse">
+                                    <thead><tr className="border-b"><th className="py-2">Field</th><th className="py-2">Type</th><th className="py-2">Description</th></tr></thead>
+                                    <tbody className="text-slate-600">
+                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">network</td><td>String</td><td>See Network Codes below</td></tr>
+                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">planId</td><td>String</td><td>e.g. "1GB", "2GB"</td></tr>
+                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">phone</td><td>String</td><td>Recipient number (054...)</td></tr>
+                                        <tr className="border-b"><td className="py-2 font-mono text-indigo-600">reference</td><td>String</td><td>Unique ID for tracking</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-slate-700 mb-2">Accepted Values</h4>
+                                <div className="bg-slate-50 p-4 rounded-xl text-xs space-y-2 font-mono text-slate-600">
+                                    <p><span className="text-slate-400">Networks:</span> "MTN", "AirtelTigo", "Telecel"</p>
+                                    <p><span className="text-slate-400">Plans:</span> "1GB", "2GB", "3GB", "5GB", "10GB"...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6">
+                            <h4 className="font-bold text-sm text-slate-700 mb-2">Code Examples</h4>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <CodeBlock language="PHP (cURL)" label="PHP Integration" code={phpCode} />
+                                <CodeBlock language="Node.js" label="Node.js Integration" code={nodeCode} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'errors' && (
+                <div className="space-y-6 animate-fade-in">
+                    <h3 className="text-xl font-bold text-slate-800">Status Codes</h3>
+                    <div className="overflow-hidden border border-slate-200 rounded-xl">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+                                <tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Meaning</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                <tr><td className="px-4 py-3 font-mono font-bold text-green-600">200</td><td className="px-4 py-3">Request Successful. Order placed.</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">400</td><td className="px-4 py-3">Bad Request. Missing fields (e.g. no phone number).</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">401</td><td className="px-4 py-3">Unauthorized. Invalid or missing API Key.</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">402</td><td className="px-4 py-3">Insufficient Balance. Fund your wallet.</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">409</td><td className="px-4 py-3">Duplicate Reference. You already used this ID.</td></tr>
+                                <tr><td className="px-4 py-3 font-mono font-bold text-red-500">500</td><td className="px-4 py-3">Server Error. Please contact support.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
       </div>
     </div>
