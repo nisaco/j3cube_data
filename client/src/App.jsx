@@ -22,12 +22,7 @@ const PRESET_COLORS = [
 ];
 
 const ThemeContext = createContext(null);
-const globalStyles = `
-  html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; overflow-x: hidden; }
-  /* Hide scrollbar for cleaner UI */
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-`;
+const globalStyles = `html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; overflow-x: hidden; } .no-scrollbar::-webkit-scrollbar { display: none; }`;
 
 // --- CONFIGURATION ---
 const API_BASE_URL = 'https://ajenterprise-datastore.onrender.com/api'; 
@@ -83,7 +78,7 @@ const timeAgo = (date) => {
     } catch (e) { return 'Unknown'; }
 };
 
-// HELPER: Format Date & Time (Safe)
+// ✅ HELPER: Safe Date Format (Prevents Blank Page Crash)
 const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
     try {
@@ -92,7 +87,7 @@ const formatDateTime = (dateString) => {
             day: 'numeric', month: 'short', 
             hour: 'numeric', minute: 'numeric', hour12: true 
         });
-    } catch (e) { return 'Invalid Date'; }
+    } catch (e) { return 'N/A'; }
 };
 
 // --- THEME GENERATOR ---
@@ -112,9 +107,8 @@ const generateTheme = (mode, accentColor) => {
 // --- HELPERS FOR CARDS ---
 const SourceBadge = ({ method, theme }) => {
     const isApi = method === 'api_wallet';
-    // Handle theme implicitly via classes passed down or safe defaults
-    const bgClass = isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-100 text-slate-500 border-slate-200';
-    return <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${bgClass}`}>{isApi ? 'API' : 'WEB'}</span>;
+    const bgClass = isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : `${theme.inputBg} ${theme.textSub}`;
+    return <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${theme.border} ${bgClass}`}>{isApi ? 'API' : 'WEB'}</span>;
 };
 
 const StatusBadge = ({ status }) => {
@@ -126,11 +120,13 @@ const StatusBadge = ({ status }) => {
     return <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${colorClass}`}>{label}</span>;
 };
 
-// ✅ NEW: DETAILED TICKET-STYLE CARD (Crash-Proof & Theme Aware)
-const TransactionCard = ({ tx, theme }) => {
+// ✅ NEW: TICKET STYLE CARD (Integrated with Main App Theme)
+const TransactionCard = ({ tx }) => {
+    const { theme } = useContext(ThemeContext);
     const isDeposit = tx.status === 'topup_successful';
+    
+    // Network Colors
     let netColor = 'bg-slate-300';
-    // Simple logic to guess network color from string if available
     const planUpper = (tx.dataPlan || '').toUpperCase();
     const netUpper = (tx.network || '').toUpperCase();
     if (netUpper.includes('MTN') || planUpper.includes('MTN')) netColor = 'bg-yellow-400';
@@ -139,20 +135,20 @@ const TransactionCard = ({ tx, theme }) => {
     if (isDeposit) netColor = 'bg-emerald-500';
 
     // Safe Date Parsing
-    let dateStr = 'N/A', timeStr = 'N/A';
+    let dateStr = 'N/A', timeStr = '';
     try {
         const dateObj = new Date(tx.createdAt);
-        dateStr = dateObj.toLocaleDateString();
+        dateStr = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         timeStr = dateObj.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     } catch(e) {}
 
     return (
-      <div className={`${theme.cardBg} rounded-2xl shadow-sm border ${theme.border} relative overflow-hidden transition-transform active:scale-95 mb-3`}>
+      <div className={`${theme.cardBg} rounded-2xl shadow-sm border ${theme.border} relative overflow-hidden hover:scale-[1.01] transition-transform mb-3`}>
         {/* Color Bar */}
         <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${netColor}`}></div>
         
         <div className="p-4 pl-6">
-            {/* Header: Network/Type & Amount */}
+            {/* Header */}
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h4 className={`font-bold ${theme.textMain} text-lg flex items-center gap-2`}>
@@ -182,7 +178,7 @@ const TransactionCard = ({ tx, theme }) => {
                 </div>
             )}
 
-            {/* Footer: Status & Source */}
+            {/* Footer */}
             <div className={`flex justify-between items-center ${isDeposit ? 'mt-1' : 'pt-1'}`}>
                 <StatusBadge status={tx.status} />
                 <SourceBadge method={tx.paymentMethod} theme={theme} />
@@ -206,7 +202,7 @@ const Input = ({ label, type = "text", value, onChange, placeholder, icon: Icon,
   const [show, setShow] = useState(false);
   return (
     <div className="mb-4">
-      {label && <label className={`block text-xs font-bold ${theme.textSub} uppercase mb-2`}>{label}</label>}
+      <label className={`block text-xs font-bold ${theme.textSub} uppercase mb-2`}>{label}</label>
       <div className="relative">
         {Icon && <Icon className={`absolute left-3 top-3.5 ${theme.textSub}`} size={18} />}
         {isTextArea ? (
@@ -508,7 +504,7 @@ const Dashboard = ({ user, transactions, setView, onTopUp, refreshUser }) => {
         {/* ✅ MOBILE: CARDS */}
         <div className="space-y-1 md:hidden">
             {transactions.length > 0 ? transactions.slice(0, 5).map((tx) => (
-                <TransactionCard key={tx._id} tx={tx} theme={theme} />
+                <TransactionCard key={tx._id} tx={tx} />
             )) : <div className={`p-8 text-center ${theme.textSub} text-sm ${theme.cardBg} rounded-xl border ${theme.border}`}>No recent transactions</div>}
         </div>
 
