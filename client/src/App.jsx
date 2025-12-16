@@ -307,11 +307,24 @@ axios(config)
                                     </tbody>
                                 </table>
                             </div>
+                            
+                            {/* ✅ NEW: ACCEPTED VALUES TABLE */}
                             <div>
-                                <h4 className="font-bold text-sm text-slate-700 mb-2">Accepted Values</h4>
-                                <div className="bg-slate-50 p-4 rounded-xl text-xs space-y-2 font-mono text-slate-600">
-                                    <p><span className="text-slate-400">Networks:</span> "MTN", "AirtelTigo", "Telecel"</p>
-                                    <p><span className="text-slate-400">Plans:</span> "1GB", "2GB", "3GB", "5GB", "10GB"...</p>
+                                <h4 className="font-bold text-sm text-slate-700 mb-2">Accepted Network Codes</h4>
+                                <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                                  <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-100 text-slate-500 font-bold uppercase text-xs">
+                                      <tr><th className="px-4 py-2">Network Name</th><th className="px-4 py-2">Code to Send</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200">
+                                      <tr><td className="px-4 py-2">MTN</td><td className="px-4 py-2 font-mono text-indigo-600">"MTN"</td></tr>
+                                      <tr><td className="px-4 py-2">AirtelTigo</td><td className="px-4 py-2 font-mono text-indigo-600">"AirtelTigo"</td></tr>
+                                      <tr><td className="px-4 py-2">Telecel</td><td className="px-4 py-2 font-mono text-indigo-600">"Telecel"</td></tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                                <div className="mt-4 text-xs text-slate-500">
+                                    <p><strong>Plan IDs:</strong> Format as capacity + GB (e.g., "1GB", "2GB", "10GB")</p>
                                 </div>
                             </div>
                         </div>
