@@ -33,7 +33,7 @@ const orderSchema = new mongoose.Schema({
         'topup_successful', 'INITIATED', 'PROCESSING', 'SUCCESSFUL', 'FAILED', 'CANCELLED',
         'withdrawal_pending', 'withdrawal_sent'
     ], required: true },
-    // Added api_wallet and paystack_auto to enum
+    // ✅ ENSURE 'api_wallet' IS HERE
     paymentMethod: { type: String, enum: ['paystack', 'wallet', 'payout', 'paystack_auto', 'api_wallet'] }, 
     role: { type: String, default: 'Client' }, // Track who bought it
     createdAt: { type: Date, default: Date.now }
@@ -52,7 +52,7 @@ const agentShopSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// 4. Withdrawal Schema (Added for completeness if needed later)
+// 4. Withdrawal Schema
 const withdrawalSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     amount: { type: Number, required: true },
