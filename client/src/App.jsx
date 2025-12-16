@@ -146,11 +146,11 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
   </div>
 );
 
-// ✅ NEW: PROFESSIONAL DEVELOPER CONSOLE
+// ✅ NEW: PROFESSIONAL DEVELOPER CONSOLE WITH PYTHON & CURL
 const DeveloperConsole = ({ user }) => {
   const [apiKey, setApiKey] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview'); // overview, endpoints, errors
+  const [activeTab, setActiveTab] = useState('overview'); 
 
   useEffect(() => { apiCall('/get-key').then(res => { if(res && res.apiKey) setApiKey(res.apiKey); }); }, []);
 
@@ -179,7 +179,7 @@ curl_setopt_array($curl, array(
   CURLOPT_POSTFIELDS =>'{
     "network": "MTN",
     "planId": "1GB",
-    "phone": "054xxxxxxx",
+    "phone": "0541234567",
     "reference": "REF-${Math.floor(Math.random()*10000)}"
   }',
   CURLOPT_HTTPHEADER => array(
@@ -196,7 +196,7 @@ const axios = require('axios');
 const data = JSON.stringify({
   "network": "MTN",
   "planId": "1GB",
-  "phone": "054xxxxxxx",
+  "phone": "0541234567",
   "reference": "unique_ref_123"
 });
 
@@ -218,9 +218,41 @@ axios(config)
   console.log(error);
 });`;
 
+  const pythonCode = `
+import requests
+import json
+import random
+
+url = "https://j3cube-data.onrender.com/api/v1/purchase"
+
+payload = json.dumps({
+  "network": "MTN",
+  "planId": "1GB",
+  "phone": "0541234567",
+  "reference": f"REF-{random.randint(1000, 9999)}"
+})
+headers = {
+  'Content-Type': 'application/json',
+  'x-api-key': 'YOUR_API_KEY'
+}
+
+response = requests.request("POST", url, headers=headers, data=payload)
+
+print(response.text)`;
+
+  const curlCode = `
+curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
+--header 'Content-Type: application/json' \\
+--header 'x-api-key: YOUR_API_KEY' \\
+--data '{
+    "network": "MTN",
+    "planId": "1GB",
+    "phone": "0541234567",
+    "reference": "unique_ref_123"
+}'`;
+
   return (
     <div className="space-y-6 animate-fade-in pb-20">
-      {/* HEADER CARD */}
       <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
         <div className="relative z-10">
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3"><Terminal className="text-green-400" /> Developer Console</h1>
@@ -243,7 +275,6 @@ axios(config)
         </div>
       </div>
 
-      {/* DOCUMENTATION TABS */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="flex border-b border-slate-100">
             <button onClick={()=>setActiveTab('overview')} className={`flex-1 py-4 text-sm font-bold border-b-2 transition ${activeTab === 'overview' ? 'border-[#009879] text-[#009879]' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>Overview & Auth</button>
@@ -308,7 +339,6 @@ axios(config)
                                 </table>
                             </div>
                             
-                            {/* ✅ NEW: ACCEPTED VALUES TABLE */}
                             <div>
                                 <h4 className="font-bold text-sm text-slate-700 mb-2">Accepted Network Codes</h4>
                                 <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
@@ -335,6 +365,8 @@ axios(config)
                             <div className="grid md:grid-cols-2 gap-4">
                                 <CodeBlock language="PHP (cURL)" label="PHP Integration" code={phpCode} />
                                 <CodeBlock language="Node.js" label="Node.js Integration" code={nodeCode} />
+                                <CodeBlock language="Python" label="Python Integration" code={pythonCode} />
+                                <CodeBlock language="Bash" label="cURL Command" code={curlCode} />
                             </div>
                         </div>
                     </div>
