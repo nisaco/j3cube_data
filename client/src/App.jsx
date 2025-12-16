@@ -4,7 +4,7 @@ import {
   ChevronRight, ArrowUpRight, ArrowDownLeft, Smartphone, 
   Loader2, User, Eye, EyeOff, ShieldCheck, Box,
   TrendingUp, Users, CreditCard, Activity, Lock, Check, AlertCircle, RefreshCw, Landmark,
-  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen
+  Code, Terminal, Copy, Globe, FileJson, Server, BookOpen, Tag
 } from 'lucide-react';
 
 // --- Global Styles ---
@@ -44,6 +44,16 @@ const apiCall = async (endpoint, options = {}) => {
     }
     return contentType && contentType.includes("application/json") ? await response.json() : { success: true };
   } catch (error) { console.error(`API Error:`, error.message); throw error; }
+};
+
+// --- HELPER: Source Badge ---
+const SourceBadge = ({ method }) => {
+    const isApi = method === 'api_wallet';
+    return (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ml-2 ${isApi ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
+            {isApi ? 'API' : 'WEB'}
+        </span>
+    );
 };
 
 // --- COMPONENTS ---
@@ -131,7 +141,14 @@ const Dashboard = ({ user, transactions, setView, onTopUp }) => (
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.status === 'data_sent' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
                 {tx.status === 'data_sent' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
               </div>
-              <div><p className="font-bold text-slate-700 text-sm">{tx.dataPlan || 'Transaction'}</p><p className="text-xs text-slate-400">{new Date(tx.createdAt).toLocaleDateString()}</p></div>
+              <div>
+                  <p className="font-bold text-slate-700 text-sm flex items-center">
+                      {tx.dataPlan || 'Transaction'} 
+                      {/* ✅ ADDED: Source Badge */}
+                      <SourceBadge method={tx.paymentMethod} />
+                  </p>
+                  <p className="text-xs text-slate-400">{new Date(tx.createdAt).toLocaleDateString()}</p>
+              </div>
             </div>
             <div className="text-right">
                 <p className="font-bold text-sm text-slate-800">GHS {tx.amount?.toFixed(2)}</p>
@@ -253,6 +270,7 @@ curl --location 'https://j3cube-data.onrender.com/api/v1/purchase' \\
 
   return (
     <div className="space-y-6 animate-fade-in pb-20">
+      {/* HEADER CARD */}
       <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
         <div className="relative z-10">
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3"><Terminal className="text-green-400" /> Developer Console</h1>
@@ -525,7 +543,10 @@ const AdminDashboard = () => {
                             <tr key={order._id} className="border-b hover:bg-slate-50">
                                 <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
                                 <td className="px-4 py-3 font-medium">{order.userId?.username || 'Unknown'}</td>
-                                <td className="px-4 py-3">{order.dataPlan} ({order.network})</td>
+                                <td className="px-4 py-3">
+                                    {order.dataPlan} ({order.network})
+                                    <SourceBadge method={order.paymentMethod} />
+                                </td>
                                 <td className="px-4 py-3">{order.phoneNumber}</td>
                                 <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${order.status === 'data_sent' ? 'bg-green-100 text-green-700' : order.status === 'topup_successful' ? 'bg-blue-100 text-blue-700' : order.status === 'failed' || order.status === 'data_failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                     {order.status === 'data_sent' ? 'Completed' : (order.status === 'pending_review' ? 'Processing' : order.status)}
@@ -663,7 +684,7 @@ export default function App() {
               {view === 'console' && <DeveloperConsole user={user} />}
               {view === 'admin' && user.role === 'Admin' && <AdminDashboard />}
               {view === 'purchase' && <Purchase refreshUser={fetchData} />}
-              {view === 'history' && <div className="bg-white rounded-2xl p-6 shadow-sm animate-fade-in"><h2 className="font-bold mb-4">History</h2>{transactions.map(t => <div key={t._id} className="p-3 border-b flex justify-between last:border-0"><span>{t.dataPlan}</span><b>GHS {t.amount}</b></div>)}</div>}
+              {view === 'history' && <div className="bg-white rounded-2xl p-6 shadow-sm animate-fade-in"><h2 className="font-bold mb-4">History</h2>{transactions.map(t => <div key={t._id} className="p-3 border-b flex justify-between last:border-0"><span>{t.dataPlan} <SourceBadge method={t.paymentMethod} /></span><b>GHS {t.amount}</b></div>)}</div>}
             </div>
           </div>
         </main>
