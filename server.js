@@ -18,7 +18,13 @@ const PORT = process.env.PORT || 10000;
 // --- CONFIGURATION ---
 const AGENT_FEE_GHS = 15.00;
 const CK_BASE_URL = 'https://console.ckgodsway.com/api'; 
-const NETWORK_MAP = { 'MTN': 'MTN_PRO', 'AirtelTigo': 'AT_PREMIUM', 'Telecel': 'TELECEL' };
+
+// ✅ NETWORK MAP
+const NETWORK_MAP = { 
+    'MTN': 'YELLO', 
+    'AirtelTigo': 'AT_PREMIUM', 
+    'Telecel': 'TELECEL' 
+};
 
 const PRICING = {
     RETAIL: { 
@@ -81,6 +87,12 @@ app.use(session({
 }));
 
 app.use(express.static(path.join(__dirname, 'client/dist')));
+
+// --- HELPER: PHONE VALIDATION ---
+// ✅ STRICT VALIDATION: Starts with 0, exactly 10 digits
+function isValidGhanaPhone(phone) {
+    return /^0\d{9}$/.test(phone);
+}
 
 // --- 3. ROUTES ---
 
@@ -171,13 +183,18 @@ app.post('/api/verify-topup', async (req, res) => {
     } catch (e) { res.status(500).json({ message: 'Server error' }); }
 });
 
-// PURCHASE (BROWSER) - ✅ UPDATED: Automatic Send, Manual Status
+// PURCHASE (BROWSER) - ✅ UPDATED
 app.post('/api/purchase', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     const { network, planId, phone } = req.body;
     const userId = req.session.user.id;
 
     try {
+        // 🚨 STRICT PHONE CHECK
+        if (!isValidGhanaPhone(phone)) {
+            return res.status(400).json({ message: 'Invalid phone number. Must start with 0 and be 10 digits.' });
+        }
+
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -188,18 +205,15 @@ app.post('/api/purchase', async (req, res) => {
         const costPesewas = Math.round(plan.price * 100);
         if (user.walletBalance < costPesewas) return res.status(400).json({ message: 'Insufficient wallet balance' });
 
-        // 1. Create Order as PROCESSING
         const newOrder = await Order.create({
             userId: user._id, reference: `PENDING-${Date.now()}`, phoneNumber: phone,
             network: network, dataPlan: plan.name, amount: plan.price, 
             status: 'PROCESSING', paymentMethod: 'wallet', role: user.role
         });
 
-        // 2. Deduct Money
         user.walletBalance -= costPesewas;
         await user.save();
 
-        // 3. AUTOMATICALLY SEND DATA
         try {
             const ckNetworkKey = NETWORK_MAP[network]; 
             const cleanCapacity = planId.replace(/[A-Za-z]/g, '');
@@ -210,10 +224,7 @@ app.post('/api/purchase', async (req, res) => {
             
             const result = apiResponse.data;
             if (result.success === true) { 
-                // ✅ SILENT MODE: Data sent, but we mark it as "Pending Review" (Processing)
-                // so the Admin (You) can manually mark it as "Completed" later.
                 newOrder.status = 'pending_review'; 
-                
                 newOrder.reference = result.data?.reference || `ORD-${Date.now()}`;
                 await newOrder.save();
                 res.json({ status: 'success', message: 'Order Placed. Processing...' });
@@ -260,12 +271,19 @@ const verifyApiKey = async (req, res, next) => {
     } catch (e) { res.status(500).json({ success: false, message: 'Auth Error' }); }
 };
 
+// 2. Generate API Key (Improved for reliability)
 app.post('/api/generate-key', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'Login required' });
     try {
         const newKey = `j3_live_${Math.random().toString(36).substr(2, 9)}${Date.now().toString(36)}`;
-        await User.findByIdAndUpdate(req.session.user.id, { apiKey: newKey });
-        res.json({ success: true, apiKey: newKey });
+        // Uses findByIdAndUpdate to ensure atomic update
+        const updatedUser = await User.findByIdAndUpdate(
+            req.session.user.id, 
+            { apiKey: newKey }, 
+            { new: true } // Return the updated document
+        );
+        if (!updatedUser) throw new Error("User update failed");
+        res.json({ success: true, apiKey: updatedUser.apiKey });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -277,12 +295,18 @@ app.get('/api/get-key', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// EXTERNAL PURCHASE - ✅ UPDATED: Automatic Send, Manual Status
+// EXTERNAL PURCHASE - ✅ UPDATED
 app.post('/api/v1/purchase', verifyApiKey, async (req, res) => {
     const { network, planId, phone, reference } = req.body;
     const user = req.user; 
     try {
         if (!network || !planId || !phone || !reference) return res.status(400).json({ success: false, message: 'Missing parameters' });
+        
+        // 🚨 STRICT PHONE CHECK FOR API USERS TOO
+        if (!isValidGhanaPhone(phone)) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number. Must start with 0 and be 10 digits.' });
+        }
+
         const exists = await Order.findOne({ reference });
         if (exists) return res.status(409).json({ success: false, message: 'Duplicate reference' });
 
@@ -314,7 +338,6 @@ app.post('/api/v1/purchase', verifyApiKey, async (req, res) => {
 
         const result = apiResponse.data;
         if (result.success === true) {
-            // ✅ SILENT MODE
             newOrder.status = 'pending_review'; 
             if(result.data?.reference) newOrder.reference = result.data.reference; 
             await newOrder.save();
@@ -401,5 +424,4 @@ app.post('/api/paystack-webhook', async (req, res) => {
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'client/dist', 'index.html')));
-
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
